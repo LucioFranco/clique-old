@@ -1,0 +1,14 @@
+[package]
+name = "clique"
+version = "0.1.0"
+authors = ["Lucio Franco <luciofranco14@gmail.com>"]
+
+[dependencies]
+tokio = "*"
+futures = "*"
+bytes = "*"
+serde = "*"
+serde_derive = "*"
+serde_json="*"
+log = "*"
+pretty_env_logger = "*"

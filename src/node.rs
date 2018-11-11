@@ -3,20 +3,19 @@ use futures::{
     sync::mpsc::{self, Receiver, Sender},
     Future, Sink, Stream,
 };
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::{
-    io::BufReader,
     net::{SocketAddr, ToSocketAddrs},
     sync::Arc,
     time::Duration,
 };
 use tokio::{
-    io::{lines, write_all, AsyncRead},
-    net::{TcpStream, UdpFramed, UdpSocket},
+    codec::Decoder,
+    net::{TcpListener, TcpStream, UdpFramed, UdpSocket},
     timer::Interval,
 };
 
-use codec::{Msg, MsgCodec};
+use codec::{Join, JoinCodec, Msg, MsgCodec};
 use state::State;
 
 pub struct Node {
@@ -42,17 +41,29 @@ impl Node {
             .next()
             .expect("One addrs required");
 
+        let inner = self.inner.clone();
+        let id = inner.id.clone();
         TcpStream::connect(&addr)
-            .and_then(|stream| {
-                let (reader, writer) = stream.split();
+            .and_then(move |stream| {
+                let (writer, reader) = JoinCodec.framed(stream).split();
 
-                let message = "I want to join\n";
-                write_all(writer, message).map(|(writer, _)| (reader, writer))
-            }).map(|(reader, _writer)| {
-                let lines = lines(BufReader::new(reader));
+                writer
+                    .send(Join::Request(id))
+                    .map(|writer| (reader, writer))
+            }).map(move |(reader, _writer)| {
+                let inner = inner.clone();
 
-                lines.for_each(move |message| {
-                    info!("TCP message received: {}", message);
+                reader.for_each(move |message| {
+                    match message {
+                        Join::Peers(incoming_peers) => {
+                            let peers = inner.peers.clone();
+                            let mut peers = peers.write().expect("Unable to acquire peers lock");
+
+                            peers.clone_from(&incoming_peers);
+                        }
+                        m => warn!("Received unexpected message: {:?}", m),
+                    };
+
                     future::ok(())
                 })
             }).map(|_| ())
@@ -61,18 +72,50 @@ impl Node {
 
     pub fn serve(&mut self) -> impl Future<Item = (), Error = ()> {
         let (tx, rx) = mpsc::channel(1000);
-        let udp_listener = self.listen_udp((tx.clone(), rx));
+        let socket = UdpSocket::bind(&self.addr).expect("Unable to bind socket for serve");
+
+        let addr = socket.local_addr().unwrap();
+
+        let udp_listener = self.listen_udp(socket, (tx.clone(), rx));
+        let tcp_listener = self.listen_tcp(&addr);
 
         let heartbeats = self.heartbeats(tx.clone());
 
-        udp_listener.join(heartbeats).map(|_| ()).map_err(|_| ())
+        tcp_listener.join3(udp_listener, heartbeats).map(|_| ())
+    }
+
+    fn listen_tcp(&self, addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
+        let socket = TcpListener::bind(addr).expect("Unable to bind tcp socket for server");
+        let inner = self.inner.clone();
+
+        socket
+            .incoming()
+            .for_each(move |stream| {
+                let remote_addr = stream.peer_addr().expect("Unable to get remote peer addr");
+                let (writer, reader) = JoinCodec.framed(stream).split();
+
+                let inner = inner.clone();
+                let response = reader.map(move |message| {
+                    let inner = inner.clone();
+                    Node::process_rpc(inner, remote_addr, message)
+                });
+
+                let msg = writer
+                    .send_all(response)
+                    .map(|_| ())
+                    .map_err(|e| error!("Error writing response: {:?}", e));
+
+                tokio::spawn(msg);
+
+                Ok(())
+            }).map_err(|_| ())
     }
 
     fn listen_udp(
         &self,
+        socket: UdpSocket,
         channel: (Sender<(Msg, SocketAddr)>, Receiver<(Msg, SocketAddr)>),
     ) -> impl Future<Item = (), Error = ()> {
-        let socket = UdpSocket::bind(&self.addr).expect("Unable to bind socket for serve");
         let (tx, rx) = channel;
 
         info!("Listening on: {}", self.addr);
@@ -102,6 +145,21 @@ impl Node {
             .join(sink)
             .map(|_| ())
             .map_err(|e| error!("Error with UDP: {:?}", e))
+    }
+
+    fn process_rpc(inner: Arc<State>, addr: SocketAddr, request: Join) -> Join {
+        let peers = inner.peers.clone();
+
+        match request {
+            Join::Request(id) => {
+                let mut peers = peers.write().expect("Unable to acquire peer lock");
+
+                peers.insert(addr, id);
+
+                Join::Done
+            }
+            _ => Join::Done,
+        }
     }
 
     fn process_message(

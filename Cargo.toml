@@ -4,11 +4,13 @@ version = "0.1.0"
 authors = ["Lucio Franco <luciofranco14@gmail.com>"]
 
 [dependencies]
-tokio = "*"
 futures = "*"
 bytes = "*"
-serde = "*"
-serde_derive = "*"
+serde = { version = "1.0" }
+serde_derive = "1.0"
 serde_json="*"
+tokio = "0.1"
+uuid = { version = "*", features= ["v4", "serde"]}
 log = "*"
 pretty_env_logger = "*"
+

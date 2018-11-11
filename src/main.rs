@@ -23,5 +23,9 @@ fn main() {
 
     let mut node = Node::new(remote_addr);
 
-    tokio::run(node.serve(vec![peer_addr]));
+    // TODO: join cluster
+
+    let server = node.serve();
+
+    tokio::run(server);
 }

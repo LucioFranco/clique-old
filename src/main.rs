@@ -1,8 +1,10 @@
 extern crate clique;
+extern crate futures;
 extern crate pretty_env_logger;
 extern crate tokio;
 
 use clique::Node;
+use futures::Future;
 use std::net::SocketAddr;
 
 fn main() {
@@ -23,9 +25,8 @@ fn main() {
 
     let mut node = Node::new(remote_addr);
 
-    // TODO: join cluster
-
-    let server = node.serve();
+    // Join the cluster then start serving the clique server
+    let server = node.join(peer_addr).and_then(move |_| node.serve());
 
     tokio::run(server);
 }

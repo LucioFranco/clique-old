@@ -10,6 +10,5 @@ extern crate uuid;
 mod codec;
 mod node;
 mod state;
-mod transport;
 
 pub use node::Node;

@@ -5,7 +5,6 @@ pub mod proto {
 
 use self::proto::{server, JoinRequest, Peer};
 //use futures::{future, Future, Stream};
-use self::proto::client::Member;
 use futures::*;
 use log::error;
 use state::State;
@@ -44,22 +43,29 @@ impl MemberServer {
         fut
     }
 
-    pub fn connect(addr: &SocketAddr) -> impl Future<Item = Member<_>, Error = std::io::Error> {
-        let uri: http::Uri = format!("http://localhost:50051").parse().unwrap();
+    // pub fn connect(addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
+    //     let uri: http::Uri = format!("http://localhost:50051").parse().unwrap();
 
-        TcpStream::connect(&addr)
-            .and_then(move |socket| {
-                // Bind the HTTP/2.0 connection
-                Connection::handshake(socket, DefaultExecutor::current())
-                    .map_err(|_| panic!("failed HTTP/2.0 handshake"))
-            }).map(move |conn| {
-                use tower_http::add_origin;
+    //     TcpStream::connect(&addr)
+    //         .and_then(move |socket| {
+    //             // Bind the HTTP/2.0 connection
+    //             Connection::handshake(socket, DefaultExecutor::current())
+    //                 .map_err(|_| panic!("failed HTTP/2.0 handshake"))
+    //         }).map(move |conn| {
+    //             use self::proto::client::Member;
+    //             use tower_http::add_origin;
 
-                let conn = add_origin::Builder::new().uri(uri).build(conn).unwrap();
+    //             let conn = add_origin::Builder::new().uri(uri).build(conn).unwrap();
 
-                Member::new(conn)
-            })
-    }
+    //             Member::new(conn)
+    //         })
+    //         .and_then(|response| {
+    //             //println!("RESPONSE = {:?}", response);
+    //             Ok(())
+    //         }).map_err(|e| {
+    //             println!("ERR = {:?}", e);
+    //         })
+    // }
 }
 
 impl server::Member for MemberServer {

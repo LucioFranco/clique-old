@@ -1,10 +1,10 @@
 use futures::{
-    future,
     sync::mpsc::{self, Receiver, Sender},
     Future, Sink, Stream,
 };
 use log::{debug, error, info, warn};
 use std::{
+    collections::HashMap,
     net::{SocketAddr, ToSocketAddrs},
     sync::Arc,
     time::Duration,
@@ -41,6 +41,8 @@ impl Node {
             .next()
             .expect("One addrs required");
 
+        info!("Sending Cluster Join Request to: {}", addr);
+
         let inner = self.inner.clone();
         let id = inner.id.clone();
         TcpStream::connect(&addr)
@@ -48,24 +50,37 @@ impl Node {
                 let (writer, reader) = JoinCodec.framed(stream).split();
 
                 writer
-                    .send(Join::Request(id))
+                    .send(Join::Request(id.to_string()))
                     .map(|writer| (reader, writer))
             }).map(move |(reader, _writer)| {
                 let inner = inner.clone();
 
-                reader.for_each(move |message| {
-                    match message {
-                        Join::Peers(incoming_peers) => {
-                            let peers = inner.peers.clone();
-                            let mut peers = peers.write().expect("Unable to acquire peers lock");
+                let response = reader
+                    .map(move |message| {
+                        info!("Received Join response message: {:?}", message);
 
-                            peers.clone_from(&incoming_peers);
-                        }
-                        m => warn!("Received unexpected message: {:?}", m),
-                    };
+                        match message {
+                            Join::Peers(incoming_peers) => {
+                                let peers = inner.peers.clone();
+                                let mut peers =
+                                    peers.write().expect("Unable to acquire peers lock");
 
-                    future::ok(())
-                })
+                                let peers_encoded = incoming_peers
+                                    .iter()
+                                    .map(|(k, v)| {
+                                        let id = uuid::Uuid::parse_str(v.as_str()).unwrap();
+                                        (k.clone(), id)
+                                    }).collect::<HashMap<SocketAddr, uuid::Uuid>>();
+
+                                peers.clone_from(&peers_encoded);
+                                info!("Got Peers!: {:?}", peers);
+                            }
+                            m => warn!("Received unexpected message: {:?}", m),
+                        };
+                    }).into_future()
+                    .map(|_| ());
+
+                tokio::spawn(response.map_err(|_| ()))
             }).map(|_| ())
             .map_err(|e| error!("Error attempting to join cluster: {:?}", e))
     }
@@ -79,9 +94,9 @@ impl Node {
         let udp_listener = self.listen_udp(socket, (tx.clone(), rx));
         let tcp_listener = self.listen_tcp(&addr);
 
-        let heartbeats = self.heartbeats(tx.clone());
+        let gossiper = self.gossip(tx.clone());
 
-        tcp_listener.join3(udp_listener, heartbeats).map(|_| ())
+        tcp_listener.join3(udp_listener, gossiper).map(|_| ())
     }
 
     fn listen_tcp(&self, addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
@@ -92,18 +107,41 @@ impl Node {
             .incoming()
             .for_each(move |stream| {
                 let remote_addr = stream.peer_addr().expect("Unable to get remote peer addr");
+                info!("Accepted new TCP Connection from: {}", remote_addr);
                 let (writer, reader) = JoinCodec.framed(stream).split();
 
+                let (tx, rx) = mpsc::channel(1);
+
                 let inner = inner.clone();
-                let response = reader.map(move |message| {
-                    let inner = inner.clone();
-                    Node::process_rpc(inner, remote_addr, message)
-                });
+                let response = reader
+                    .map(move |message| {
+                        let inner = inner.clone();
+                        let response = Node::process_rpc(inner, (message, remote_addr));
+
+                        let tx = tx.clone();
+                        tokio::spawn(tx.send(response).map(|_| ()).map_err(|_| ()));
+                    }).into_future();
+
+                tokio::spawn(response.map(|_| ()).map_err(|_| ()));
 
                 let msg = writer
-                    .send_all(response)
-                    .map(|_| ())
-                    .map_err(|e| error!("Error writing response: {:?}", e));
+                    .send_all(
+                        rx.map(|message| {
+                            info!("Sending: {:?}", message);
+                            message
+                        }).map_err(|_| {
+                            std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                "rx shouldn't have an error",
+                            )
+                        }),
+                    ).then(|res| {
+                        if let Err(e) = res {
+                            println!("failed to process connection; error = {:?}", e);
+                        }
+
+                        Ok(())
+                    });
 
                 tokio::spawn(msg);
 
@@ -134,8 +172,6 @@ impl Node {
 
         let inner = self.inner.clone();
         let stream = stream.for_each(move |(msg, addr)| {
-            debug!("Got Message: {:?} from: {:?}", msg, addr);
-
             Node::process_message(inner.clone(), tx.clone(), msg, addr);
 
             Ok(())
@@ -147,16 +183,24 @@ impl Node {
             .map_err(|e| error!("Error with UDP: {:?}", e))
     }
 
-    fn process_rpc(inner: Arc<State>, addr: SocketAddr, request: Join) -> Join {
+    fn process_rpc(inner: Arc<State>, request: (Join, SocketAddr)) -> Join {
         let peers = inner.peers.clone();
 
+        let (request, addr) = request;
         match request {
             Join::Request(id) => {
+                info!("Cluster Join Request from: {}", id);
                 let mut peers = peers.write().expect("Unable to acquire peer lock");
-
+                let id = uuid::Uuid::parse_str(id.as_str()).unwrap();
                 peers.insert(addr, id);
 
-                Join::Done
+                Join::Peers(
+                    peers
+                        .clone()
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.to_string()))
+                        .collect::<HashMap<SocketAddr, String>>(),
+                )
             }
             _ => Join::Done,
         }
@@ -185,7 +229,7 @@ impl Node {
         }
     }
 
-    fn heartbeats(&self, tx: Sender<(Msg, SocketAddr)>) -> impl Future<Item = (), Error = ()> {
+    fn gossip(&self, tx: Sender<(Msg, SocketAddr)>) -> impl Future<Item = (), Error = ()> {
         let inner = self.inner.clone();
         Interval::new_interval(Duration::from_secs(3))
             .for_each(move |_| {

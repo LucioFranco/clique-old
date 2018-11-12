@@ -2,7 +2,7 @@ use bytes::{BufMut, BytesMut};
 use serde_derive::{Deserialize, Serialize};
 use std::{collections::HashMap, net::SocketAddr};
 use tokio::codec::{Decoder, Encoder};
-use uuid::Uuid;
+//use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Msg {
@@ -39,8 +39,8 @@ impl Encoder for MsgCodec {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Join {
-    Request(Uuid),
-    Peers(HashMap<SocketAddr, Uuid>),
+    Request(String),
+    Peers(HashMap<SocketAddr, String>),
     Done,
 }
 

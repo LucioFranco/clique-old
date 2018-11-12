@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package clique.proto;
+
+service Member {
+  rpc join(JoinRequest) returns (Peer);
+}
+
+message JoinRequest {
+  string id = 1;
+  string address = 2;
+}
+
+message Peer {
+  string id = 1;
+  string address = 2;
+}

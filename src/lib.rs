@@ -7,8 +7,16 @@ extern crate serde_json;
 extern crate tokio;
 extern crate uuid;
 
+extern crate prost;
+#[macro_use]
+extern crate prost_derive;
+extern crate tower_grpc;
+extern crate tower_h2;
+extern crate tower_http;
+
 mod codec;
 mod node;
+mod rpc;
 mod state;
 
 pub use node::Node;

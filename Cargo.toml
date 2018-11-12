@@ -14,3 +14,15 @@ uuid = { version = "0.7", features = ["serde", "v4"] }
 log = "*"
 pretty_env_logger = "*"
 
+http = "0.1"
+prost = "0.4"
+prost-derive = "0.4"
+tokio-core = "0.1"
+tower-h2 = { path = "../tower-h2" }
+tower-http = { git = "https://github.com/tower-rs/tower-http"  }
+tower-service = { git = "https://github.com/tower-rs/tower", rev = "882fe7240bb1bd5e2de19f14ef1cb898cdd6a0e0"}
+tower-grpc = { path ="../tower-grpc" }
+
+[build-dependencies]
+tower-grpc-build = { git = "https://github.com/tower-rs/tower-grpc" }
+

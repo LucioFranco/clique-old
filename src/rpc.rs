@@ -3,33 +3,37 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/clique.proto.rs"));
 }
 
-use self::proto::{server, JoinRequest, Peer};
+pub use self::proto::{client, server, JoinRequest, Peer};
 //use futures::{future, Future, Stream};
 use futures::*;
 use log::error;
+use state::NodeState;
 use state::State;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+};
 use tokio::executor::DefaultExecutor;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tower_grpc::{Request, Response};
-use tower_h2::{client::Connection, Server};
+use tower_h2::Server;
 
 #[derive(Debug, Clone)]
 pub struct MemberServer {
-    inner: Arc<State>,
+    inner: Arc<RwLock<State>>,
 }
 
 impl MemberServer {
-    pub fn new(state: Arc<State>) -> Self {
+    pub fn new(state: Arc<RwLock<State>>) -> Self {
         MemberServer { inner: state }
     }
 
-    pub fn serve(state: Arc<State>, addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
-        let h2 = Server::new(
-            server::MemberServer::new(MemberServer::new(state)),
-            Default::default(),
-            DefaultExecutor::current(),
-        );
+    pub fn serve(
+        state: Arc<RwLock<State>>,
+        addr: &SocketAddr,
+    ) -> impl Future<Item = (), Error = ()> {
+        let new_service = server::MemberServer::new(MemberServer::new(state));
+        let mut h2 = Server::new(new_service, Default::default(), DefaultExecutor::current());
 
         let bind = TcpListener::bind(&addr).unwrap();
         let fut = bind
@@ -42,37 +46,22 @@ impl MemberServer {
 
         fut
     }
-
-    // pub fn connect(addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
-    //     let uri: http::Uri = format!("http://localhost:50051").parse().unwrap();
-
-    //     TcpStream::connect(&addr)
-    //         .and_then(move |socket| {
-    //             // Bind the HTTP/2.0 connection
-    //             Connection::handshake(socket, DefaultExecutor::current())
-    //                 .map_err(|_| panic!("failed HTTP/2.0 handshake"))
-    //         }).map(move |conn| {
-    //             use self::proto::client::Member;
-    //             use tower_http::add_origin;
-
-    //             let conn = add_origin::Builder::new().uri(uri).build(conn).unwrap();
-
-    //             Member::new(conn)
-    //         })
-    //         .and_then(|response| {
-    //             //println!("RESPONSE = {:?}", response);
-    //             Ok(())
-    //         }).map_err(|e| {
-    //             println!("ERR = {:?}", e);
-    //         })
-    // }
 }
 
 impl server::Member for MemberServer {
     type JoinFuture = future::FutureResult<Response<Peer>, tower_grpc::Error>;
 
     fn join(&mut self, request: Request<JoinRequest>) -> Self::JoinFuture {
-        let state = self.inner.clone();
-        unimplemented!()
+        let inner = self.inner.clone();
+        let mut state = inner.write().unwrap();
+
+        println!("{:?}", request);
+
+        state.node_state = NodeState::Connected;
+
+        futures::future::ok(Response::new(Peer {
+            id: "hello".into(),
+            address: "some-address".into(),
+        }))
     }
 }

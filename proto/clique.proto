@@ -7,11 +7,9 @@ service Member {
 }
 
 message JoinRequest {
-  string id = 1;
-  string address = 2;
+  repeated string peers = 2;
 }
 
 message Peer {
-  string id = 1;
-  string address = 2;
+  repeated string peers = 2;
 }

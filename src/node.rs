@@ -5,7 +5,7 @@ use futures::{
 use log::{debug, error, info};
 use std::{
     net::{SocketAddr, ToSocketAddrs},
-    sync::{Arc, RwLock},
+    sync::Arc,
     time::Duration,
 };
 use tokio::{
@@ -19,14 +19,14 @@ use state::State;
 
 pub struct Node {
     addr: SocketAddr,
-    inner: Arc<RwLock<State>>,
+    inner: Arc<State>,
 }
 
 impl Node {
     pub fn new(addr: SocketAddr) -> Self {
         Node {
             addr,
-            inner: Arc::new(RwLock::new(State::new())),
+            inner: Arc::new(State::new()),
         }
     }
 
@@ -34,13 +34,14 @@ impl Node {
     where
         A: ToSocketAddrs,
     {
+        // TODO: add proper address selection process
         let addr = peers
             .to_socket_addrs()
             .unwrap()
             .next()
             .expect("One addrs required");
 
-        join(&addr)
+        join(&self.addr, &addr)
     }
 
     pub fn serve(&mut self) -> impl Future<Item = (), Error = ()> {
@@ -99,7 +100,7 @@ impl Node {
     }
 
     fn process_message(
-        inner: Arc<RwLock<State>>,
+        _inner: Arc<State>,
         tx: Sender<(Msg, SocketAddr)>,
         msg: Msg,
         addr: SocketAddr,
@@ -110,14 +111,7 @@ impl Node {
             }
 
             Msg::Ack => {
-                let inner = inner.read().unwrap();
-                let mut peers = inner.peers.write().expect("unable to acquire lock");
-
-                if let None = peers.get(&addr) {
-                    let new_id = uuid::Uuid::new_v4();
-                    info!("Added peer: {} with {}", new_id, addr);
-                    peers.insert(addr, new_id);
-                }
+                // TODO: handle ack message
             }
         }
     }
@@ -127,12 +121,11 @@ impl Node {
         Interval::new_interval(Duration::from_secs(3))
             .for_each(move |_| {
                 debug!("sending heartbeat");
-                let inner = inner.read().unwrap();
-                let peers = inner.peers.read().expect("unable to acquire lock");
+                let peers = inner.peers();
 
                 let heartbeats = peers
                     .iter()
-                    .map(|(addr, _id)| (Msg::Ping, *addr))
+                    .map(|(_id, addr)| (Msg::Ping, *addr))
                     .map(|msg| {
                         let tx = tx.clone();
                         tx.send(msg)

@@ -1,5 +1,6 @@
 extern crate bytes;
 extern crate futures;
+extern crate indexmap;
 extern crate log;
 extern crate serde;
 extern crate serde_derive;

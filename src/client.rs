@@ -6,10 +6,12 @@ use tokio::{executor::DefaultExecutor, net::TcpStream};
 use tower_grpc::Request;
 use tower_h2::client::Connection;
 
-pub fn join(addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
+pub fn join(local_addr: &SocketAddr, join_addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
     let uri: http::Uri = format!("http://localhost:8082").parse().unwrap();
 
-    TcpStream::connect(&addr)
+    let local_addr = local_addr.clone();
+
+    TcpStream::connect(&join_addr)
         .and_then(move |socket| {
             // Bind the HTTP/2.0 connection
             Connection::handshake(socket, DefaultExecutor::current())
@@ -20,11 +22,10 @@ pub fn join(addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
             let conn2 = add_origin::Builder::new().uri(uri).build(conn).unwrap();
 
             Member::new(conn2)
-        }).and_then(|mut client| {
+        }).and_then(move |mut client| {
             client
                 .join(Request::new(JoinRequest {
-                    id: "12314".into(),
-                    address: "1213123123".into(),
+                    peers: vec![local_addr.to_string()],
                 })).map_err(|e| panic!("gRPC request failed; err={:?}", e))
         }).and_then(|response| {
             println!("RESPONSE = {:?}", response);

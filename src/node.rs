@@ -61,8 +61,7 @@ impl Node {
     fn listen_tcp(&self, addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
         use rpc::MemberServer;
 
-        let inner = self.inner.clone();
-        MemberServer::serve(inner, addr)
+        MemberServer::serve(self.inner.clone(), addr)
     }
 
     fn listen_udp(

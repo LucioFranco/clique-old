@@ -12,7 +12,8 @@ message Push  {
 }
 
 message Pull {
-  repeated Peer peers = 1;
+  Peer from = 1;
+  repeated Peer peers = 2;
 }
 
 message Peer {

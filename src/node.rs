@@ -2,7 +2,7 @@ use futures::{
     sync::mpsc::{self, Receiver, Sender},
     Future, Sink, Stream,
 };
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use std::{
     net::{SocketAddr, ToSocketAddrs},
     sync::Arc,
@@ -90,6 +90,13 @@ impl Node {
                     }).collect();
                 inner.peers_sync(peers);
                 inner.update_state(NodeState::Connected);
+
+                let from = body.from.unwrap();
+                info!(
+                    "Connected to clique cluster via {}:{}",
+                    from.id, from.address
+                );
+
                 Ok(())
             }).map_err(|e| {
                 error!("Error encountered during join rpc: {:?}", e);
@@ -129,7 +136,7 @@ impl Node {
 
         let rx = rx
             .map(|(msg, addr)| {
-                debug!("Sending: {:?} to: {:?}", msg, addr);
+                trace!("Sending: {:?} to: {:?}", msg, addr);
                 (msg, addr)
             }).map_err(|_| {
                 std::io::Error::new(std::io::ErrorKind::Other, "rx shouldn't have an error")
@@ -169,10 +176,12 @@ impl Node {
 
     fn gossip(&self, tx: Sender<(Msg, SocketAddr)>) -> impl Future<Item = (), Error = ()> {
         let inner = self.inner.clone();
-        Interval::new_interval(Duration::from_secs(3))
+        // TODO: Set the interval from config
+        Interval::new_interval(Duration::from_secs(1))
             .for_each(move |_| {
-                debug!("sending heartbeat");
                 let peers = inner.peers();
+
+                debug!("Sending heartbeats");
 
                 let heartbeats = peers
                     .iter()

@@ -63,6 +63,14 @@ impl server::Member for MemberServer {
 
         trace!("Pushing these peers: {:?}", peers);
 
-        futures::future::ok(Response::new(Pull { peers }))
+        let current_peer = Peer {
+            id: self.inner.id().to_string(),
+            address: self.addr.to_string(),
+        };
+
+        futures::future::ok(Response::new(Pull {
+            from: Some(current_peer),
+            peers,
+        }))
     }
 }

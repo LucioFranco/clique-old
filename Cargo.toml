@@ -1,6 +1,6 @@
 [package]
 name = "clique"
-version = "0.0.0"
+version = "0.1.0"
 authors = ["Lucio Franco <luciofranco14@gmail.com>"]
 description = "A SWIM based gossip library"
 

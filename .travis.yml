@@ -1,0 +1,28 @@
+# Set up the Rust toolchain.
+language: rust
+
+os:
+- linux
+- osx
+- windows
+
+rust:
+  - stable
+  - beta
+  - nightly
+
+ # Allow for occasional compiler breakage on nightly Rust.
+matrix:
+  allow_failures:
+    - rust: nightly
+  fast_finish: true
+  include:
+    - rust: stable
+      script:
+        - cargo test --all --all-featurs --locked
+        - rustup component add rustfmt-preview
+        - cargo fmt -- --write-mode=diff
+  
+script:
+  - cargo test --all --all-featurs --locked
+

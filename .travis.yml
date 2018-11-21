@@ -6,11 +6,6 @@ os:
 - osx
 - windows
 
-rust:
-  - stable
-  - beta
-  - nightly
-
  # Allow for occasional compiler breakage on nightly Rust.
 matrix:
   allow_failures:
@@ -22,7 +17,9 @@ matrix:
         - cargo test --all --all-features --locked
         - rustup component add rustfmt-preview
         - cargo fmt -- --write-mode=diff
-  
-script:
-  - cargo test --all --all-features --locked
-
+    - rust: beta
+      script:
+        - cargo test --all --all-features --locked
+    - rust: nightly
+      script:
+        - cargo test --all --all-features --locked

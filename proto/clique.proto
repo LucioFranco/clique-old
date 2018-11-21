@@ -3,13 +3,19 @@ syntax = "proto3";
 package clique.proto;
 
 service Member {
-  rpc join(JoinRequest) returns (Peer);
+  rpc join(Push) returns (Pull);
 }
 
-message JoinRequest {
-  repeated string peers = 2;
+message Push  {
+  Peer from = 1;
+  repeated Peer peers = 2;
+}
+
+message Pull {
+  repeated Peer peers = 1;
 }
 
 message Peer {
-  repeated string peers = 2;
+  string id = 1;
+  string address = 2;
 }

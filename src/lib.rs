@@ -15,7 +15,6 @@ extern crate tower_grpc;
 extern crate tower_h2;
 extern crate tower_http;
 
-mod client;
 mod codec;
 mod node;
 mod rpc;

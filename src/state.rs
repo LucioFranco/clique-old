@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use log::trace;
 use std::{
     net::SocketAddr,
     sync::{Arc, RwLock, RwLockReadGuard},
@@ -41,8 +42,35 @@ impl State {
         self.peers.read().expect("Peers lock poisoned")
     }
 
+    pub fn id(&self) -> RwLockReadGuard<Uuid> {
+        self.id.read().expect("Unable to acquire read lock for id")
+    }
+
     pub fn update_state(&self, state: NodeState) {
         let mut current_state = self.state.write().expect("Unable to get write lock");
         std::mem::replace(&mut *current_state, state);
+    }
+
+    pub fn peers_sync(&self, incoming_peers: Vec<(SocketAddr, Uuid)>) {
+        let mut peers = self
+            .peers
+            .write()
+            .expect("Unable to acquire write lock, in sync");
+
+        for (addr, id) in incoming_peers {
+            if !peers.contains_key(&id) {
+                trace!("Adding peer: {:?}, from: {:?}", id, addr);
+                peers.insert(id, addr);
+            }
+        }
+    }
+
+    pub fn insert_peer(&self, id: Uuid, addr: SocketAddr) {
+        // TODO: this should probably update the addr if the id already exists
+        self.peers
+            .write()
+            .expect("Unable to acquire write lock")
+            .entry(id)
+            .or_insert(addr);
     }
 }

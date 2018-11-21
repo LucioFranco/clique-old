@@ -9,13 +9,17 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    net::{UdpFramed, UdpSocket},
+    executor::DefaultExecutor,
+    net::{TcpStream, UdpFramed, UdpSocket},
     timer::Interval,
 };
+use tower_grpc::Request;
+use tower_h2::client::Connection;
+use uuid::Uuid;
 
-use client::join;
 use codec::{Msg, MsgCodec};
-use state::State;
+use rpc::proto::{client::Member, Peer, Push};
+use state::{NodeState, State};
 
 pub struct Node {
     addr: SocketAddr,
@@ -35,13 +39,61 @@ impl Node {
         A: ToSocketAddrs,
     {
         // TODO: add proper address selection process
-        let addr = peers
+        let join_addr = peers
             .to_socket_addrs()
             .unwrap()
             .next()
             .expect("One addrs required");
 
-        join(&self.addr, &addr)
+        let local_addr = self.addr.clone();
+        let uri: http::Uri = format!("http://localhost:{}", local_addr.port())
+            .parse()
+            .unwrap();
+
+        let inner = self.inner.clone();
+        let from_address = local_addr.clone();
+
+        let id = inner.id().to_string();
+        TcpStream::connect(&join_addr)
+            .and_then(move |socket| {
+                // Bind the HTTP/2.0 connection
+                Connection::handshake(socket, DefaultExecutor::current())
+                    .map_err(|_| panic!("failed HTTP/2.0 handshake"))
+            }).map(move |conn| {
+                use tower_http::add_origin;
+
+                let conn = add_origin::Builder::new().uri(uri).build(conn).unwrap();
+
+                Member::new(conn)
+            }).and_then(move |mut client| {
+                let from = Peer {
+                    id: id.to_string(),
+                    address: from_address.to_string(),
+                };
+
+                client
+                    .join(Request::new(Push {
+                        from: Some(from.clone()),
+                        peers: vec![from],
+                    })).map_err(|e| panic!("gRPC request failed; err={:?}", e))
+            }).and_then(move |response| {
+                let body = response.into_inner();
+
+                let peers = body
+                    .peers
+                    .into_iter()
+                    .map(|peer| {
+                        (
+                            peer.address.parse().unwrap(),
+                            Uuid::parse_str(peer.id.as_str()).unwrap(),
+                        )
+                    }).collect();
+                inner.peers_sync(peers);
+                inner.update_state(NodeState::Connected);
+                Ok(())
+            }).map_err(|e| {
+                error!("Error encountered during join rpc: {:?}", e);
+            })
     }
 
     pub fn serve(&mut self) -> impl Future<Item = (), Error = ()> {

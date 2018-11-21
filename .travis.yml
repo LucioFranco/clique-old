@@ -17,8 +17,7 @@ matrix:
     - rust: nightly
   fast_finish: true
   include:
-    - rust: rustfmt
-      env: TRAVIS_RUST_VERSION=stable
+    - rust: stable
       script:
         - rustup component add rustfmt-preview
         - cargo fmt -- --write-mode=diff

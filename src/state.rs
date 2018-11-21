@@ -3,7 +3,7 @@ use log::trace;
 use std::{
     collections::VecDeque,
     net::SocketAddr,
-    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 use uuid::Uuid;
 
@@ -15,30 +15,19 @@ pub enum NodeState {
 
 #[derive(Debug)]
 pub struct State {
-    id: Arc<RwLock<Uuid>>,
-    peers: Arc<RwLock<IndexMap<Uuid, SocketAddr>>>,
-    state: Arc<RwLock<NodeState>>,
-    broadcasts: Arc<RwLock<VecDeque<Vec<u8>>>>,
-}
-
-impl Clone for State {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id.clone(),
-            peers: self.peers.clone(),
-            state: self.state.clone(),
-            broadcasts: self.broadcasts.clone(),
-        }
-    }
+    id: RwLock<Uuid>,
+    peers: RwLock<IndexMap<Uuid, SocketAddr>>,
+    state: RwLock<NodeState>,
+    broadcasts: RwLock<VecDeque<Vec<u8>>>,
 }
 
 impl State {
     pub fn new() -> Self {
         State {
-            id: Arc::new(RwLock::new(Uuid::new_v4())),
-            peers: Arc::new(RwLock::new(IndexMap::new())),
-            state: Arc::new(RwLock::new(NodeState::Disconnected)),
-            broadcasts: Arc::new(RwLock::new(VecDeque::new())),
+            id: RwLock::new(Uuid::new_v4()),
+            peers: RwLock::new(IndexMap::new()),
+            state: RwLock::new(NodeState::Disconnected),
+            broadcasts: RwLock::new(VecDeque::new()),
         }
     }
 

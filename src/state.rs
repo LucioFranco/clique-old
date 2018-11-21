@@ -1,8 +1,9 @@
 use indexmap::IndexMap;
 use log::trace;
 use std::{
+    collections::VecDeque,
     net::SocketAddr,
-    sync::{Arc, RwLock, RwLockReadGuard},
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 use uuid::Uuid;
 
@@ -17,6 +18,7 @@ pub struct State {
     id: Arc<RwLock<Uuid>>,
     peers: Arc<RwLock<IndexMap<Uuid, SocketAddr>>>,
     state: Arc<RwLock<NodeState>>,
+    broadcasts: Arc<RwLock<VecDeque<Vec<u8>>>>,
 }
 
 impl Clone for State {
@@ -25,6 +27,7 @@ impl Clone for State {
             id: self.id.clone(),
             peers: self.peers.clone(),
             state: self.state.clone(),
+            broadcasts: self.broadcasts.clone(),
         }
     }
 }
@@ -35,6 +38,7 @@ impl State {
             id: Arc::new(RwLock::new(Uuid::new_v4())),
             peers: Arc::new(RwLock::new(IndexMap::new())),
             state: Arc::new(RwLock::new(NodeState::Disconnected)),
+            broadcasts: Arc::new(RwLock::new(VecDeque::new())),
         }
     }
 
@@ -72,5 +76,11 @@ impl State {
             .expect("Unable to acquire write lock")
             .entry(id)
             .or_insert(addr);
+    }
+
+    pub fn broadcasts_mut(&self) -> RwLockWriteGuard<VecDeque<Vec<u8>>> {
+        self.broadcasts
+            .write()
+            .expect("Unable to acquire write lock")
     }
 }

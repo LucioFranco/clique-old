@@ -1,3 +1,7 @@
+//! # Clique
+//!
+//! A SWIM based gossip protocol library. Coming soon.
+
 extern crate bytes;
 extern crate futures;
 extern crate indexmap;

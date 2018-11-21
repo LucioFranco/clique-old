@@ -19,10 +19,10 @@ matrix:
   include:
     - rust: stable
       script:
-        - cargo test --all --all-featurs --locked
+        - cargo test --all --all-features --locked
         - rustup component add rustfmt-preview
         - cargo fmt -- --write-mode=diff
   
 script:
-  - cargo test --all --all-featurs --locked
+  - cargo test --all --all-features --locked
 

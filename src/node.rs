@@ -17,9 +17,12 @@ use tower_grpc::Request;
 use tower_h2::client::Connection;
 use uuid::Uuid;
 
-use codec::{Msg, MsgCodec};
-use rpc::proto::{client::Member, Peer, Push};
-use state::{NodeState, State};
+use crate::codec::{Msg, MsgCodec};
+use crate::rpc::{
+    proto::{client::Member, Peer, Push},
+    MemberServer,
+};
+use crate::state::{NodeState, State};
 
 pub struct Node {
     addr: SocketAddr,
@@ -46,7 +49,7 @@ impl Node {
             .expect("One addrs required");
 
         let local_addr = self.addr.clone();
-        let uri: http::Uri = format!("http://localhost:{}", local_addr.port())
+        let uri: http::Uri = format!("http://{}:{}", local_addr.ip(), local_addr.port())
             .parse()
             .unwrap();
 
@@ -118,8 +121,6 @@ impl Node {
     }
 
     fn listen_tcp(&self, addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
-        use rpc::MemberServer;
-
         MemberServer::serve(self.inner.clone(), addr)
     }
 
@@ -158,18 +159,25 @@ impl Node {
     }
 
     fn process_message(
-        _inner: Arc<State>,
+        state: Arc<State>,
         tx: Sender<(Msg, SocketAddr)>,
         msg: Msg,
         addr: SocketAddr,
     ) {
         match msg {
-            Msg::Ping => {
-                tokio::spawn(tx.send((Msg::Ack, addr)).map(|_| ()).map_err(|_| ()));
+            Msg::Ping(broadcasts) => {
+                state.apply_broadcasts(broadcasts);
+
+                let ack = {
+                    let broadcasts = state.broadcasts_mut().drain();
+                    Msg::Ack(broadcasts)
+                };
+
+                tokio::spawn(tx.send((ack, addr)).map(|_| ()).map_err(|_| ()));
             }
 
-            Msg::Ack => {
-                // TODO: handle ack message
+            Msg::Ack(broadcasts) => {
+                state.apply_broadcasts(broadcasts);
             }
         }
     }
@@ -181,12 +189,16 @@ impl Node {
             .for_each(move |_| {
                 let peers = inner.peers();
 
-                debug!("Sending heartbeats");
+                trace!("Sending heartbeats");
+
+                let broadcasts = inner.broadcasts_mut().drain();
 
                 let heartbeats = peers
                     .iter()
-                    .map(|(_id, addr)| (Msg::Ping, *addr))
-                    .map(|msg| {
+                    .map(move |(_id, peer)| {
+                        let ping = Msg::Ping(broadcasts.clone());
+                        (ping, peer.addr())
+                    }).map(|msg| {
                         let tx = tx.clone();
                         tx.send(msg)
                     }).collect::<Vec<_>>();

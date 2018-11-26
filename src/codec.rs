@@ -1,12 +1,12 @@
 use bytes::{BufMut, BytesMut};
+use crate::broadcasts::Broadcast;
 use serde_derive::{Deserialize, Serialize};
 use tokio::codec::{Decoder, Encoder};
-//use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Msg {
-    Ping,
-    Ack,
+    Ping(Vec<Broadcast>),
+    Ack(Vec<Broadcast>),
 }
 
 pub struct MsgCodec;

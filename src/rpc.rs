@@ -4,9 +4,9 @@ pub mod proto {
 }
 
 pub use self::proto::{client, server, Peer, Pull, Push};
+use crate::state::State;
 use futures::{future, Future, Stream};
-use log::{error, trace};
-use state::State;
+use log::{error, info, trace};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::executor::DefaultExecutor;
 use tokio::net::TcpListener;
@@ -44,21 +44,21 @@ impl server::Member for MemberServer {
     type JoinFuture = future::FutureResult<Response<Pull>, tower_grpc::Error>;
 
     fn join(&mut self, request: Request<Push>) -> Self::JoinFuture {
-        trace!("Join Request: {:?}", request);
+        info!("Join Request: {:?}", request);
 
         let from = request.into_inner().from.unwrap();
 
         let from_id = Uuid::parse_str(from.id.as_str()).unwrap();
         let from_addr = from.address.parse().unwrap();
-        self.inner.insert_peer(from_id, from_addr);
+        self.inner.peer_join(from_id, from_addr);
 
         let peers = self
             .inner
             .peers()
             .iter()
-            .map(|(id, addr)| Peer {
+            .map(|(id, peer)| Peer {
                 id: id.to_string(),
-                address: addr.to_string(),
+                address: peer.addr().to_string(),
             }).collect();
 
         trace!("Pushing these peers: {:?}", peers);

@@ -101,7 +101,7 @@ impl State {
                     self.insert_peer(peer);
                     self.add_broadcast(Broadcast::Joined(id, addr));
                 },
-                _ => unimplemented!(),
+                //_ => unimplemented!(),
             }
         }
     }

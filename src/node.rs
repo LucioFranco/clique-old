@@ -2,7 +2,7 @@ use futures::{
     sync::mpsc::{self, Receiver, Sender},
     Future, Sink, Stream,
 };
-use log::{debug, error, info, trace};
+use log::{error, info, trace};
 use std::{
     net::{SocketAddr, ToSocketAddrs},
     sync::Arc,

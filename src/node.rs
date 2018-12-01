@@ -74,7 +74,7 @@ impl Node {
                 )
             })
             .collect();
-        
+
         inner.peers_sync(peers);
         inner.update_state(NodeState::Connected);
 

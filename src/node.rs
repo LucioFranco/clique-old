@@ -11,6 +11,7 @@ use tokio::{
 };
 use tower_grpc::Request;
 use tower_h2::client::Connection;
+use tower_http::add_origin;
 use uuid::Uuid;
 
 use crate::codec::{Msg, MsgCodec};
@@ -46,61 +47,47 @@ impl Node {
         let from_address = local_addr.clone();
 
         let id = inner.id().to_string();
-        let connect = TcpStream::connect(&join_addr)
-            .and_then(move |socket| {
-                // Bind the HTTP/2.0 connection
-                Connection::handshake(socket, DefaultExecutor::current())
-                    .map_err(|_| panic!("failed HTTP/2.0 handshake"))
+        let socket = await!(TcpStream::connect(&join_addr)).unwrap();
+
+        let conn = await!(Connection::handshake(socket, DefaultExecutor::current())).unwrap();
+
+        let conn = add_origin::Builder::new().uri(uri).build(conn).unwrap();
+
+        let mut client = Member::new(conn);
+
+        let from = Peer {
+            id: id.to_string(),
+            address: from_address.to_string(),
+        };
+
+        let request = client.join(Request::new(Push {
+            from: Some(from.clone()),
+            peers: vec![from],
+        }));
+
+        let response = await!(request).unwrap();
+
+        let body = response.into_inner();
+
+        let peers = body
+            .peers
+            .into_iter()
+            .map(|peer| {
+                (
+                    peer.address.parse().unwrap(),
+                    Uuid::parse_str(peer.id.as_str()).unwrap(),
+                )
             })
-            .map(move |conn| {
-                use tower_http::add_origin;
+            .collect();
+        inner.peers_sync(peers);
+        inner.update_state(NodeState::Connected);
 
-                let conn = add_origin::Builder::new().uri(uri).build(conn).unwrap();
+        let from = body.from.unwrap();
 
-                Member::new(conn)
-            })
-            .and_then(move |mut client| {
-                let from = Peer {
-                    id: id.to_string(),
-                    address: from_address.to_string(),
-                };
-
-                client
-                    .join(Request::new(Push {
-                        from: Some(from.clone()),
-                        peers: vec![from],
-                    }))
-                    .map_err(|e| panic!("gRPC request failed; err={:?}", e))
-            })
-            .and_then(move |response| {
-                let body = response.into_inner();
-
-                let peers = body
-                    .peers
-                    .into_iter()
-                    .map(|peer| {
-                        (
-                            peer.address.parse().unwrap(),
-                            Uuid::parse_str(peer.id.as_str()).unwrap(),
-                        )
-                    })
-                    .collect();
-                inner.peers_sync(peers);
-                inner.update_state(NodeState::Connected);
-
-                let from = body.from.unwrap();
-                info!(
-                    "Connected to clique cluster via {}:{}",
-                    from.id, from.address
-                );
-
-                Ok(())
-            })
-            .map_err(|e| {
-                error!("Error encountered during join rpc: {:?}", e);
-            });
-
-        await!(connect)?;
+        info!(
+            "Connected to clique cluster via {}:{}",
+            from.id, from.address
+        );
 
         Ok(())
     }

@@ -7,17 +7,15 @@ os:
 - windows
 
 rust:
-  - stable
-  - beta
+  # - stable
+  # - beta
   - nightly
 
  # Allow for occasional compiler breakage on nightly Rust.
 matrix:
-  allow_failures:
-    - rust: nightly
   fast_finish: true
   include:
-    - rust: stable
+    - rust: nightly
       script:
         - rustup component add rustfmt-preview
         - cargo fmt -- --check

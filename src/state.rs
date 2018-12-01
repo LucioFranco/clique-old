@@ -1,14 +1,15 @@
-use indexmap::IndexMap;
-use log::{info, trace};
-use std::{
-    net::SocketAddr,
-    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
-use uuid::Uuid;
-
-use crate::{
-    broadcasts::{Broadcast, Broadcasts},
-    peer::Peer,
+use {
+    crate::{
+        broadcasts::{Broadcast, Broadcasts},
+        peer::Peer,
+    },
+    indexmap::IndexMap,
+    log::{info, trace},
+    std::{
+        net::SocketAddr,
+        sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    },
+    uuid::Uuid,
 };
 
 #[derive(Debug, PartialEq, Clone)]

@@ -1,10 +1,12 @@
 #![feature(await_macro, async_await, futures_api)]
 
-use clique::Node;
-use std::{net::SocketAddr, sync::Arc};
-
 #[macro_use]
 extern crate tokio;
+
+use {
+    clique::Node,
+    std::{net::SocketAddr, sync::Arc},
+};
 
 fn main() {
     let local_addr: SocketAddr = std::env::args()

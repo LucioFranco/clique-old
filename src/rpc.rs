@@ -4,15 +4,18 @@ pub mod proto {
 }
 
 pub use self::proto::{client, server, Peer, Pull, Push};
-use crate::state::State;
-use futures::{future, Future, Stream};
-use log::{error, info, trace};
-use std::{net::SocketAddr, sync::Arc};
-use tokio::executor::DefaultExecutor;
-use tokio::net::TcpListener;
-use tower_grpc::{Request, Response};
-use tower_h2::Server;
-use uuid::Uuid;
+
+use {
+    crate::state::State,
+    futures::{future, Future, Stream},
+    log::{error, info, trace},
+    std::{net::SocketAddr, sync::Arc},
+    tokio::executor::DefaultExecutor,
+    tokio::net::TcpListener,
+    tower_grpc::{Request, Response},
+    tower_h2::Server,
+    uuid::Uuid,
+};
 
 #[derive(Debug, Clone)]
 pub struct MemberServer {

@@ -1,26 +1,27 @@
-use futures::{
-    sync::mpsc::{self, Receiver, Sender},
-    Sink, Stream,
-};
-use futures_util::join;
-use log::{error, info, trace};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{
-    net::{UdpFramed, UdpSocket},
-    prelude::*,
-    timer::Interval,
-};
-use tower_grpc::Request;
-use uuid::Uuid;
-
-use crate::{
-    client,
-    codec::{Msg, MsgCodec},
-    rpc::{
-        proto::{Peer, Push},
-        MemberServer,
+use {
+    crate::{
+        client,
+        codec::{Msg, MsgCodec},
+        rpc::{
+            proto::{Peer, Push},
+            MemberServer,
+        },
+        state::{NodeState, State},
     },
-    state::{NodeState, State},
+    futures::{
+        sync::mpsc::{self, Receiver, Sender},
+        Sink, Stream,
+    },
+    futures_util::join,
+    log::{error, info, trace},
+    std::{net::SocketAddr, sync::Arc, time::Duration},
+    tokio::{
+        net::{UdpFramed, UdpSocket},
+        prelude::*,
+        timer::Interval,
+    },
+    tower_grpc::Request,
+    uuid::Uuid,
 };
 
 pub struct Node {

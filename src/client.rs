@@ -1,11 +1,12 @@
-use http::Uri;
-use std::net::SocketAddr;
-use tokio::{executor::DefaultExecutor, net::TcpStream};
-use tower_grpc::BoxBody;
-use tower_h2::client::Connection;
-use tower_http::{add_origin, AddOrigin};
-
-use crate::rpc::proto::client::Member;
+use {
+    crate::rpc::proto::client::Member,
+    http::Uri,
+    std::net::SocketAddr,
+    tokio::{executor::DefaultExecutor, net::TcpStream},
+    tower_grpc::BoxBody,
+    tower_h2::client::Connection,
+    tower_http::{add_origin, AddOrigin},
+};
 
 #[allow(dead_code)]
 pub type Client = Member<AddOrigin<Connection<TcpStream, DefaultExecutor, BoxBody>>>;

@@ -43,10 +43,9 @@ impl Node {
             .parse()
             .unwrap();
 
-        let inner = self.inner.clone();
         let from_address = local_addr.clone();
 
-        let id = inner.id().to_string();
+        let id = self.inner.id().to_string();
 
         let mut client = await!(client::connect(&join_addr, uri)).unwrap();
 
@@ -75,8 +74,8 @@ impl Node {
             })
             .collect();
 
-        inner.peers_sync(peers);
-        inner.update_state(NodeState::Connected);
+        self.inner.peers_sync(peers);
+        self.inner.update_state(NodeState::Connected);
 
         let from = body.from.unwrap();
 

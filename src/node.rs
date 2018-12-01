@@ -11,13 +11,15 @@ use tokio::{
 use tower_grpc::Request;
 use uuid::Uuid;
 
-use crate::client::connect;
-use crate::codec::{Msg, MsgCodec};
-use crate::rpc::{
-    proto::{Peer, Push},
-    MemberServer,
+use crate::{
+    client,
+    codec::{Msg, MsgCodec},
+    rpc::{
+        proto::{Peer, Push},
+        MemberServer,
+    },
+    state::{NodeState, State},
 };
-use crate::state::{NodeState, State};
 
 pub struct Node {
     addr: SocketAddr,
@@ -46,7 +48,7 @@ impl Node {
 
         let id = inner.id().to_string();
 
-        let mut client = await!(connect(&join_addr, uri)).unwrap();
+        let mut client = await!(client::connect(&join_addr, uri)).unwrap();
 
         let from = Peer {
             id: id.to_string(),
@@ -72,6 +74,7 @@ impl Node {
                 )
             })
             .collect();
+        
         inner.peers_sync(peers);
         inner.update_state(NodeState::Connected);
 

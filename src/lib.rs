@@ -10,6 +10,7 @@ extern crate prost_derive;
 extern crate tokio;
 
 mod broadcasts;
+mod client;
 mod codec;
 mod node;
 mod peer;

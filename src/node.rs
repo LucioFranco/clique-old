@@ -5,18 +5,16 @@ use futures::{
 use log::{error, info, trace};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
-    executor::DefaultExecutor,
-    net::{TcpStream, UdpFramed, UdpSocket},
+    net::{UdpFramed, UdpSocket},
     timer::Interval,
 };
 use tower_grpc::Request;
-use tower_h2::client::Connection;
-use tower_http::add_origin;
 use uuid::Uuid;
 
+use crate::client::connect;
 use crate::codec::{Msg, MsgCodec};
 use crate::rpc::{
-    proto::{client::Member, Peer, Push},
+    proto::{Peer, Push},
     MemberServer,
 };
 use crate::state::{NodeState, State};
@@ -47,13 +45,8 @@ impl Node {
         let from_address = local_addr.clone();
 
         let id = inner.id().to_string();
-        let socket = await!(TcpStream::connect(&join_addr)).unwrap();
 
-        let conn = await!(Connection::handshake(socket, DefaultExecutor::current())).unwrap();
-
-        let conn = add_origin::Builder::new().uri(uri).build(conn).unwrap();
-
-        let mut client = Member::new(conn);
+        let mut client = await!(connect(&join_addr, uri)).unwrap();
 
         let from = Peer {
             id: id.to_string(),

@@ -90,16 +90,14 @@ impl Node {
         Ok(())
     }
 
-    pub async fn serve(&self) -> Result<(), ()> {
+    pub async fn serve(&self) -> Result<(), std::io::Error> {
         let (tx, rx) = mpsc::channel(1000);
-        let socket = UdpSocket::bind(&self.addr).expect("Unable to bind socket for serve");
+        let socket = UdpSocket::bind(&self.addr)?;
 
-        let addr = socket.local_addr().unwrap();
+        let addr = socket.local_addr()?;
 
         let udp_listener = self.listen_udp(socket, (tx.clone(), rx));
-
         let tcp_listener = self.listen_tcp(addr.clone());
-
         let gossiper = self.gossip(tx);
 
         join!(tcp_listener, udp_listener, gossiper);

@@ -1,5 +1,5 @@
 use futures::{
-    sync::mpsc::{self, Receiver, Sender},
+    sync::mpsc::{self, Sender},
     Future, Sink, Stream,
 };
 use log::{error, info, trace};
@@ -88,15 +88,14 @@ impl Node {
     }
 
     pub async fn serve(&self) -> Result<(), ()> {
-        let (tx, rx) = mpsc::channel(1000);
         let socket = UdpSocket::bind(&self.addr).expect("Unable to bind socket for serve");
 
         let addr = socket.local_addr().unwrap();
 
-        let udp_listener = self.listen_udp(socket, (tx.clone(), rx));
+        let (tx, udp_listener) = self.listen_udp(socket);
         let tcp_listener = self.listen_tcp(&addr);
 
-        let gossiper = self.gossip(tx.clone());
+        let gossiper = self.gossip(tx);
 
         let serve = tcp_listener.join3(udp_listener, gossiper).map(|_| ());
 
@@ -112,9 +111,12 @@ impl Node {
     fn listen_udp(
         &self,
         socket: UdpSocket,
-        channel: (Sender<(Msg, SocketAddr)>, Receiver<(Msg, SocketAddr)>),
-    ) -> impl Future<Item = (), Error = ()> {
-        let (tx, rx) = channel;
+    ) -> (
+        Sender<(Msg, SocketAddr)>,
+        impl Future<Item = (), Error = ()>,
+    ) {
+        let (tx, rx) = mpsc::channel(1000);
+        let tx2 = tx.clone();
 
         info!("Listening on: {}", self.addr);
 
@@ -138,10 +140,12 @@ impl Node {
             Ok(())
         });
 
-        stream
+        let fut = stream
             .join(sink)
             .map(|_| ())
-            .map_err(|e| error!("Error with UDP: {:?}", e))
+            .map_err(|e| error!("Error with UDP: {:?}", e));
+
+        (tx2, fut)
     }
 
     fn process_message(

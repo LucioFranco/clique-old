@@ -11,9 +11,17 @@ use crate::rpc::proto::client::Member;
 pub type Client = Member<AddOrigin<Connection<TcpStream, DefaultExecutor, BoxBody>>>;
 
 pub async fn connect(addr: &SocketAddr, origin: Uri) -> Result<Client, ()> {
-    let socket = await!(TcpStream::connect(addr)).unwrap();
-    let conn = await!(Connection::handshake(socket, DefaultExecutor::current())).unwrap();
-    let conn = add_origin::Builder::new().uri(origin).build(conn).unwrap();
+    let socket = await!(TcpStream::connect(addr)).expect("Unable to create the TcpStream");
+
+    let conn = {
+        let conn = await!(Connection::handshake(socket, DefaultExecutor::current()))
+            .expect("Unable to create the connection");
+
+        add_origin::Builder::new()
+            .uri(origin)
+            .build(conn)
+            .expect("Unable to add origin")
+    };
 
     Ok(Member::new(conn))
 }

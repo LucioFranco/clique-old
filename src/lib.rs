@@ -2,7 +2,7 @@
 //!
 //! A SWIM based gossip protocol library. Coming soon.
 
-#![feature(await_macro, async_await, futures_api)]
+#![feature(pin, async_await, await_macro, futures_api)]
 
 #[macro_use]
 extern crate prost_derive;

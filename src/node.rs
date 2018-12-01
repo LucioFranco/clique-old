@@ -2,6 +2,7 @@ use futures::{
     sync::mpsc::{self, Sender},
     Future, Sink, Stream,
 };
+use futures_util::join;
 use log::{error, info, trace};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
@@ -93,19 +94,26 @@ impl Node {
         let addr = socket.local_addr().unwrap();
 
         let (tx, udp_listener) = self.listen_udp(socket);
-        let tcp_listener = self.listen_tcp(&addr);
+
+        let udp_listener = async {
+            await!(udp_listener).expect("Error gossiping");
+        };
+
+        let tcp_listener = self.listen_tcp(addr.clone());
 
         let gossiper = self.gossip(tx);
+        let gossiper = async {
+            await!(gossiper).expect("Error gossiping");
+        };
 
-        let serve = tcp_listener.join3(udp_listener, gossiper).map(|_| ());
-
-        await!(serve)?;
+        join!(tcp_listener, udp_listener, gossiper);
 
         Ok(())
     }
 
-    fn listen_tcp(&self, addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
-        MemberServer::serve(self.inner.clone(), addr)
+    async fn listen_tcp(&self, addr: SocketAddr) {
+        let inner = self.inner.clone();
+        await!(MemberServer::serve(inner, &addr)).expect("Error listening for rpc");
     }
 
     fn listen_udp(

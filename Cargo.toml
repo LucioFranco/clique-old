@@ -16,6 +16,7 @@ travis-ci = { repository = "LucioFranco/clique", branch = "master" }
 
 [dependencies]
 futures = "0.1"
+futures-util-preview = "0.3.0-alpha.10"
 bytes = "0.4"
 indexmap = "1.0"
 serde = "1.0"

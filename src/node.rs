@@ -149,7 +149,7 @@ impl Node {
         &self,
         mut tx: Sender<(Msg, SocketAddr)>,
         (msg, addr): (Msg, SocketAddr),
-    ) -> Result<(), futures::sync::mpsc::SendError<(Msg, SocketAddr)>> {
+    ) -> Result<(), mpsc::SendError<(Msg, SocketAddr)>> {
         match msg {
             Msg::Ping(broadcasts) => {
                 self.inner.apply_broadcasts(broadcasts);

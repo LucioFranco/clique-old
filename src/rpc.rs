@@ -36,7 +36,8 @@ impl MemberServer {
                 let fut = h2.serve(sock).map_err(|err| error!("h2 error: {:?}", err));
                 tokio::spawn(fut);
                 Ok(())
-            }).map_err(|err| error!("server error: {:?}", err))
+            })
+            .map_err(|err| error!("server error: {:?}", err))
     }
 }
 
@@ -59,7 +60,8 @@ impl server::Member for MemberServer {
             .map(|(id, peer)| Peer {
                 id: id.to_string(),
                 address: peer.addr().to_string(),
-            }).collect();
+            })
+            .collect();
 
         trace!("Pushing these peers: {:?}", peers);
 

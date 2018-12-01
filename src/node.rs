@@ -3,11 +3,7 @@ use futures::{
     Future, Sink, Stream,
 };
 use log::{error, info, trace};
-use std::{
-    net::{SocketAddr, ToSocketAddrs},
-    sync::Arc,
-    time::Duration,
-};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     executor::DefaultExecutor,
     net::{TcpStream, UdpFramed, UdpSocket},
@@ -37,16 +33,9 @@ impl Node {
         }
     }
 
-    pub fn join<A>(&self, peers: A) -> impl Future<Item = (), Error = ()>
-    where
-        A: ToSocketAddrs,
-    {
+    pub async fn join(&self, peers: Vec<SocketAddr>) -> Result<(), ()> {
         // TODO: add proper address selection process
-        let join_addr = peers
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .expect("One addrs required");
+        let join_addr = peers.into_iter().next().expect("One addrs required");
 
         let local_addr = self.addr.clone();
         let uri: http::Uri = format!("http://{}:{}", local_addr.ip(), local_addr.port())
@@ -57,18 +46,20 @@ impl Node {
         let from_address = local_addr.clone();
 
         let id = inner.id().to_string();
-        TcpStream::connect(&join_addr)
+        let connect = TcpStream::connect(&join_addr)
             .and_then(move |socket| {
                 // Bind the HTTP/2.0 connection
                 Connection::handshake(socket, DefaultExecutor::current())
                     .map_err(|_| panic!("failed HTTP/2.0 handshake"))
-            }).map(move |conn| {
+            })
+            .map(move |conn| {
                 use tower_http::add_origin;
 
                 let conn = add_origin::Builder::new().uri(uri).build(conn).unwrap();
 
                 Member::new(conn)
-            }).and_then(move |mut client| {
+            })
+            .and_then(move |mut client| {
                 let from = Peer {
                     id: id.to_string(),
                     address: from_address.to_string(),
@@ -78,8 +69,10 @@ impl Node {
                     .join(Request::new(Push {
                         from: Some(from.clone()),
                         peers: vec![from],
-                    })).map_err(|e| panic!("gRPC request failed; err={:?}", e))
-            }).and_then(move |response| {
+                    }))
+                    .map_err(|e| panic!("gRPC request failed; err={:?}", e))
+            })
+            .and_then(move |response| {
                 let body = response.into_inner();
 
                 let peers = body
@@ -90,7 +83,8 @@ impl Node {
                             peer.address.parse().unwrap(),
                             Uuid::parse_str(peer.id.as_str()).unwrap(),
                         )
-                    }).collect();
+                    })
+                    .collect();
                 inner.peers_sync(peers);
                 inner.update_state(NodeState::Connected);
 
@@ -101,12 +95,17 @@ impl Node {
                 );
 
                 Ok(())
-            }).map_err(|e| {
-                error!("Error encountered during join rpc: {:?}", e);
             })
+            .map_err(|e| {
+                error!("Error encountered during join rpc: {:?}", e);
+            });
+
+        await!(connect)?;
+
+        Ok(())
     }
 
-    pub fn serve(&mut self) -> impl Future<Item = (), Error = ()> {
+    pub async fn serve(&self) -> Result<(), ()> {
         let (tx, rx) = mpsc::channel(1000);
         let socket = UdpSocket::bind(&self.addr).expect("Unable to bind socket for serve");
 
@@ -117,7 +116,11 @@ impl Node {
 
         let gossiper = self.gossip(tx.clone());
 
-        tcp_listener.join3(udp_listener, gossiper).map(|_| ())
+        let serve = tcp_listener.join3(udp_listener, gossiper).map(|_| ());
+
+        await!(serve)?;
+
+        Ok(())
     }
 
     fn listen_tcp(&self, addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
@@ -139,7 +142,8 @@ impl Node {
             .map(|(msg, addr)| {
                 trace!("Sending: {:?} to: {:?}", msg, addr);
                 (msg, addr)
-            }).map_err(|_| {
+            })
+            .map_err(|_| {
                 std::io::Error::new(std::io::ErrorKind::Other, "rx shouldn't have an error")
             });
 
@@ -198,10 +202,12 @@ impl Node {
                     .map(move |(_id, peer)| {
                         let ping = Msg::Ping(broadcasts.clone());
                         (ping, peer.addr())
-                    }).map(|msg| {
+                    })
+                    .map(|msg| {
                         let tx = tx.clone();
                         tx.send(msg)
-                    }).collect::<Vec<_>>();
+                    })
+                    .collect::<Vec<_>>();
 
                 tokio::spawn(
                     futures::future::join_all(heartbeats)
@@ -210,6 +216,7 @@ impl Node {
                 );
 
                 Ok(())
-            }).map_err(|_| ())
+            })
+            .map_err(|_| ())
     }
 }

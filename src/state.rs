@@ -92,15 +92,17 @@ impl State {
     pub fn apply_broadcasts(&self, broadcasts: Vec<Broadcast>) {
         for broadcast in broadcasts {
             match broadcast {
-                Broadcast::Joined(id, addr) => if !self.peers().contains_key(&id) {
-                    // TODO: check to see if the addr matches what we know of that peer
-                    let peer = Peer::new_alive(id, addr);
+                Broadcast::Joined(id, addr) => {
+                    if !self.peers().contains_key(&id) {
+                        // TODO: check to see if the addr matches what we know of that peer
+                        let peer = Peer::new_alive(id, addr);
 
-                    info!("Peer: {:?} has joined", peer);
+                        info!("Peer: {:?} has joined", peer);
 
-                    self.insert_peer(peer);
-                    self.add_broadcast(Broadcast::Joined(id, addr));
-                },
+                        self.insert_peer(peer);
+                        self.add_broadcast(Broadcast::Joined(id, addr));
+                    }
+                }
                 //_ => unimplemented!(),
             }
         }

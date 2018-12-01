@@ -6,6 +6,8 @@
 
 #[macro_use]
 extern crate prost_derive;
+#[macro_use]
+extern crate tokio;
 
 mod broadcasts;
 mod codec;

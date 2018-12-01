@@ -1,12 +1,13 @@
 use futures::{
-    sync::mpsc::{self, Sender},
-    Future, Sink, Stream,
+    sync::mpsc::{self, Receiver, Sender},
+    Sink, Stream,
 };
 use futures_util::join;
 use log::{error, info, trace};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::{UdpFramed, UdpSocket},
+    prelude::*,
     timer::Interval,
 };
 use tower_grpc::Request;
@@ -89,22 +90,16 @@ impl Node {
     }
 
     pub async fn serve(&self) -> Result<(), ()> {
+        let (tx, rx) = mpsc::channel(1000);
         let socket = UdpSocket::bind(&self.addr).expect("Unable to bind socket for serve");
 
         let addr = socket.local_addr().unwrap();
 
-        let (tx, udp_listener) = self.listen_udp(socket);
-
-        let udp_listener = async {
-            await!(udp_listener).expect("Error gossiping");
-        };
+        let udp_listener = self.listen_udp(socket, (tx.clone(), rx));
 
         let tcp_listener = self.listen_tcp(addr.clone());
 
         let gossiper = self.gossip(tx);
-        let gossiper = async {
-            await!(gossiper).expect("Error gossiping");
-        };
 
         join!(tcp_listener, udp_listener, gossiper);
 
@@ -116,101 +111,87 @@ impl Node {
         await!(MemberServer::serve(inner, &addr)).expect("Error listening for rpc");
     }
 
-    fn listen_udp(
+    async fn listen_udp(
         &self,
         socket: UdpSocket,
-    ) -> (
-        Sender<(Msg, SocketAddr)>,
-        impl Future<Item = (), Error = ()>,
+        (tx, mut rx): (Sender<(Msg, SocketAddr)>, Receiver<(Msg, SocketAddr)>),
     ) {
-        let (tx, rx) = mpsc::channel(1000);
-        let tx2 = tx.clone();
-
         info!("Listening on: {}", self.addr);
 
-        let (sink, stream) = UdpFramed::new(socket, MsgCodec).split();
+        let (mut sink, mut stream) = UdpFramed::new(socket, MsgCodec).split();
 
-        let rx = rx
-            .map(|(msg, addr)| {
-                trace!("Sending: {:?} to: {:?}", msg, addr);
-                (msg, addr)
-            })
-            .map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::Other, "rx shouldn't have an error")
-            });
+        let message_receiver = async {
+            while let Some(Ok(msg)) = await!(stream.next()) {
+                trace!("Received: {:?}", msg);
+                let tx = tx.clone();
 
-        let sink = sink.send_all(rx);
+                if let Err(e) = await!(self.process_message(tx, msg)) {
+                    error!("Receiving message: {}", e);
+                }
+            }
+        };
 
-        let inner = self.inner.clone();
-        let stream = stream.for_each(move |(msg, addr)| {
-            Node::process_message(inner.clone(), tx.clone(), msg, addr);
+        let message_sender = async {
+            while let Some(Ok(msg)) = await!(rx.next()) {
+                trace!("Sending: {:?} to: {:?}", msg.0, msg.1);
 
-            Ok(())
-        });
+                if let Err(e) = await!(sink.send_async(msg)) {
+                    error!("Sending message: {}", e);
+                }
+            }
+        };
 
-        let fut = stream
-            .join(sink)
-            .map(|_| ())
-            .map_err(|e| error!("Error with UDP: {:?}", e));
-
-        (tx2, fut)
+        join!(message_receiver, message_sender);
     }
 
-    fn process_message(
-        state: Arc<State>,
-        tx: Sender<(Msg, SocketAddr)>,
-        msg: Msg,
-        addr: SocketAddr,
-    ) {
+    async fn process_message(
+        &self,
+        mut tx: Sender<(Msg, SocketAddr)>,
+        (msg, addr): (Msg, SocketAddr),
+    ) -> Result<(), futures::sync::mpsc::SendError<(Msg, SocketAddr)>> {
         match msg {
             Msg::Ping(broadcasts) => {
-                state.apply_broadcasts(broadcasts);
+                self.inner.apply_broadcasts(broadcasts);
 
                 let ack = {
-                    let broadcasts = state.broadcasts_mut().drain();
+                    let broadcasts = self.inner.broadcasts_mut().drain();
                     Msg::Ack(broadcasts)
                 };
 
-                tokio::spawn(tx.send((ack, addr)).map(|_| ()).map_err(|_| ()));
+                let msg = (ack, addr);
+                await!(tx.send_async(msg))
             }
 
             Msg::Ack(broadcasts) => {
-                state.apply_broadcasts(broadcasts);
+                self.inner.apply_broadcasts(broadcasts);
+                Ok(())
             }
         }
     }
 
-    fn gossip(&self, tx: Sender<(Msg, SocketAddr)>) -> impl Future<Item = (), Error = ()> {
-        let inner = self.inner.clone();
-        // TODO: Set the interval from config
-        Interval::new_interval(Duration::from_secs(1))
-            .for_each(move |_| {
-                let peers = inner.peers();
+    async fn gossip(&self, tx: Sender<(Msg, SocketAddr)>) {
+        let mut interval = Interval::new_interval(Duration::from_secs(1));
 
-                trace!("Sending heartbeats");
+        while let Some(_) = await!(interval.next()) {
+            // Take a snapshot of the current set of peers
+            let peers = self.inner.peers().clone();
 
-                let broadcasts = inner.broadcasts_mut().drain();
+            trace!("Sending heartbeats");
 
-                let heartbeats = peers
-                    .iter()
-                    .map(move |(_id, peer)| {
-                        let ping = Msg::Ping(broadcasts.clone());
-                        (ping, peer.addr())
-                    })
-                    .map(|msg| {
-                        let tx = tx.clone();
-                        tx.send(msg)
-                    })
-                    .collect::<Vec<_>>();
+            let broadcasts = self.inner.broadcasts_mut().drain().clone();
 
-                tokio::spawn(
-                    futures::future::join_all(heartbeats)
-                        .map(|_| ())
-                        .map_err(|_| ()),
-                );
+            let heartbeats = peers
+                .iter()
+                .map(move |(_id, peer)| {
+                    let ping = Msg::Ping(broadcasts.clone());
+                    (ping, peer.addr())
+                })
+                .collect::<Vec<_>>();
 
-                Ok(())
-            })
-            .map_err(|_| ())
+            for heartbeat in heartbeats {
+                let tx = tx.clone();
+                await!(tx.send(heartbeat)).expect("Unable to send heartbeat");
+            }
+        }
     }
 }

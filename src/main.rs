@@ -18,23 +18,25 @@ fn main() {
     std::env::set_var("RUST_LOG", "clique=debug");
     pretty_env_logger::init();
 
+    // Bootstrap lazy future to allow us to call spawn
+    let server = run(local_addr, peer_addr);
+
+    tokio::run_async(server);
+}
+
+async fn run(local_addr: SocketAddr, peer_addr: Option<String>) {
     // Create a new Node, which contains all the state for
     // our Clique based service
     let node = Arc::new(Node::new(local_addr));
 
-    // Bootstrap lazy future to allow us to call spawn
-    let server = async move {
-        if let Some(peer_addr) = peer_addr {
-            let peer_addr: SocketAddr = peer_addr.parse().unwrap();
-            let node = Arc::clone(&node);
+    if let Some(peer_addr) = peer_addr {
+        let peer_addr: SocketAddr = peer_addr.parse().unwrap();
+        let node = Arc::clone(&node);
 
-            // Join a remote cluster or _Clique_
-            tokio::spawn_async(async move { await!(node.join(vec![peer_addr])).unwrap() });
-        }
+        // Join a remote cluster or _Clique_
+        await!(node.join(vec![peer_addr])).unwrap();
+    }
 
-        // Starts TCP, UDP and Gossip tasks
-        tokio::spawn_async(async move { await!(node.serve()).unwrap() });
-    };
-
-    tokio::run_async(server);
+    // Starts TCP, UDP and Gossip tasks
+    await!(node.serve()).expect("Error running node.serve");
 }

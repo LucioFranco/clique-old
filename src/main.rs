@@ -1,11 +1,12 @@
-extern crate clique;
-extern crate futures;
-extern crate pretty_env_logger;
+#![feature(await_macro, async_await, futures_api)]
+
+#[macro_use]
 extern crate tokio;
 
-use clique::Node;
-use futures::future;
-use std::net::SocketAddr;
+use {
+    clique::Node,
+    std::{net::SocketAddr, sync::Arc},
+};
 
 fn main() {
     let local_addr: SocketAddr = std::env::args()
@@ -20,23 +21,24 @@ fn main() {
     pretty_env_logger::init();
 
     // Bootstrap lazy future to allow us to call spawn
-    let server = future::lazy(move || {
-        // Create a new Node, which contains all the state for
-        // our Clique based service
-        let mut node = Node::new(local_addr);
+    let server = run(local_addr, peer_addr);
 
-        if let Some(peer_addr) = peer_addr {
-            let peer_addr: SocketAddr = peer_addr.parse().unwrap();
+    tokio::run_async(server);
+}
 
-            // Join a remote cluster or _Clique_
-            tokio::spawn(node.join(peer_addr));
-        }
+async fn run(local_addr: SocketAddr, peer_addr: Option<String>) {
+    // Create a new Node, which contains all the state for
+    // our Clique based service
+    let node = Arc::new(Node::new(local_addr));
 
-        // Starts TCP, UDP and Gossip tasks
-        tokio::spawn(node.serve());
+    if let Some(peer_addr) = peer_addr {
+        let peer_addr: SocketAddr = peer_addr.parse().unwrap();
+        let node = Arc::clone(&node);
 
-        future::ok(())
-    });
+        // Join a remote cluster or _Clique_
+        await!(node.join(vec![peer_addr])).unwrap();
+    }
 
-    tokio::run(server);
+    // Starts TCP, UDP and Gossip tasks
+    await!(node.serve()).expect("Error running node.serve");
 }

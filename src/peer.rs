@@ -1,5 +1,4 @@
-use std::net::SocketAddr;
-use uuid::Uuid;
+use {std::net::SocketAddr, uuid::Uuid};
 
 #[derive(Debug, Clone)]
 pub enum PeerState {

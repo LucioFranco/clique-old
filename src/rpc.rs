@@ -4,15 +4,18 @@ pub mod proto {
 }
 
 pub use self::proto::{client, server, Peer, Pull, Push};
-use crate::state::State;
-use futures::{future, Future, Stream};
-use log::{error, info, trace};
-use std::{net::SocketAddr, sync::Arc};
-use tokio::executor::DefaultExecutor;
-use tokio::net::TcpListener;
-use tower_grpc::{Request, Response};
-use tower_h2::Server;
-use uuid::Uuid;
+
+use {
+    crate::state::State,
+    futures::{future, Future, Stream},
+    log::{error, info, trace},
+    std::{net::SocketAddr, sync::Arc},
+    tokio::executor::DefaultExecutor,
+    tokio::net::TcpListener,
+    tower_grpc::{Request, Response},
+    tower_h2::Server,
+    uuid::Uuid,
+};
 
 #[derive(Debug, Clone)]
 pub struct MemberServer {
@@ -36,7 +39,8 @@ impl MemberServer {
                 let fut = h2.serve(sock).map_err(|err| error!("h2 error: {:?}", err));
                 tokio::spawn(fut);
                 Ok(())
-            }).map_err(|err| error!("server error: {:?}", err))
+            })
+            .map_err(|err| error!("server error: {:?}", err))
     }
 }
 
@@ -59,7 +63,8 @@ impl server::Member for MemberServer {
             .map(|(id, peer)| Peer {
                 id: id.to_string(),
                 address: peer.addr().to_string(),
-            }).collect();
+            })
+            .collect();
 
         trace!("Pushing these peers: {:?}", peers);
 

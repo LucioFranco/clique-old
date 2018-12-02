@@ -1,7 +1,9 @@
-use bytes::{BufMut, BytesMut};
-use crate::broadcasts::Broadcast;
-use serde_derive::{Deserialize, Serialize};
-use tokio::codec::{Decoder, Encoder};
+use {
+    crate::broadcasts::Broadcast,
+    bytes::{BufMut, BytesMut},
+    serde_derive::{Deserialize, Serialize},
+    tokio::codec::{Decoder, Encoder},
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Msg {

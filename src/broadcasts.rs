@@ -1,6 +1,8 @@
-use serde_derive::{Deserialize, Serialize};
-use std::{collections::VecDeque, net::SocketAddr};
-use uuid::Uuid;
+use {
+    serde_derive::{Deserialize, Serialize},
+    std::{collections::VecDeque, net::SocketAddr},
+    uuid::Uuid,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Broadcast {

@@ -1,12 +1,8 @@
-#[allow(dead_code)]
-pub mod proto {
-    include!(concat!(env!("OUT_DIR"), "/clique.proto.rs"));
-}
-
-pub use self::proto::{client, server, Peer, Pull, Push};
-
 use {
-    crate::state::State,
+    crate::{
+        rpc::proto::{server, Peer, Pull, Push},
+        state::State,
+    },
     futures::{future, Future, Stream},
     log::{error, info, trace},
     std::{net::SocketAddr, sync::Arc},

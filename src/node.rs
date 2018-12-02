@@ -1,10 +1,10 @@
 use {
     crate::{
-        client,
         codec::{Msg, MsgCodec},
         rpc::{
+            client,
             proto::{Peer, Push},
-            MemberServer,
+            server::MemberServer,
         },
         state::{NodeState, State},
     },

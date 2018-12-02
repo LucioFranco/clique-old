@@ -5,6 +5,7 @@ extern crate tokio;
 
 use {
     clique::Node,
+    log::error,
     std::{net::SocketAddr, sync::Arc},
 };
 
@@ -36,9 +37,13 @@ async fn run(local_addr: SocketAddr, peer_addr: Option<String>) {
         let node = Arc::clone(&node);
 
         // Join a remote cluster or _Clique_
-        await!(node.join(vec![peer_addr])).unwrap();
+        if let Err(e) = await!(node.join(vec![peer_addr])) {
+            error!("Error joining cluster: {}", e);
+        }
     }
 
     // Starts TCP, UDP and Gossip tasks
-    await!(node.serve()).expect("Error running node.serve");
+    if let Err(e) = await!(node.serve()) {
+        error!("Error running node: {}", e);
+    }
 }

@@ -37,7 +37,7 @@ impl Node {
         }
     }
 
-    pub async fn join(&self, peers: Vec<SocketAddr>) -> Result<(), ()> {
+    pub async fn join(&self, peers: Vec<SocketAddr>) -> Result<(), crate::error::Error> {
         // TODO: add proper address selection process
         let join_addr = peers.into_iter().next().expect("One addrs required");
 
@@ -62,30 +62,30 @@ impl Node {
             peers: vec![from],
         }));
 
-        let response = await!(request).unwrap();
+        let response = await!(request)?;
 
-        let body = response.into_inner();
+        let peers = {
+            let body = response.into_inner();
+            let from = body.from.unwrap();
 
-        let peers = body
-            .peers
-            .into_iter()
-            .map(|peer| {
-                (
-                    peer.address.parse().unwrap(),
-                    Uuid::parse_str(peer.id.as_str()).unwrap(),
-                )
-            })
-            .collect();
+            info!(
+                "Connected to clique cluster via {}:{}",
+                from.id, from.address
+            );
+
+            body.peers
+                .into_iter()
+                .map(|peer| {
+                    (
+                        peer.address.parse().unwrap(),
+                        Uuid::parse_str(peer.id.as_str()).unwrap(),
+                    )
+                })
+                .collect()
+        };
 
         self.inner.peers_sync(peers);
         self.inner.update_state(NodeState::Connected);
-
-        let from = body.from.unwrap();
-
-        info!(
-            "Connected to clique cluster via {}:{}",
-            from.id, from.address
-        );
 
         Ok(())
     }

@@ -12,9 +12,11 @@ extern crate tokio;
 mod broadcasts;
 mod client;
 mod codec;
+mod error;
 mod node;
 mod peer;
 mod rpc;
 mod state;
 
+pub use crate::error::Error;
 pub use crate::node::Node;

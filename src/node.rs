@@ -106,8 +106,9 @@ impl Node {
     }
 
     async fn listen_tcp(&self, addr: SocketAddr) {
-        let inner = self.inner.clone();
-        await!(MemberServer::serve(inner, &addr)).expect("Error listening for rpc");
+        if let Err(e) = await!(MemberServer::serve(self.inner.clone(), &addr)) {
+            error!("Error listening for rpc calls: {}", e); 
+        }
     }
 
     async fn listen_udp(

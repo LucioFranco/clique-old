@@ -28,7 +28,10 @@ impl MemberServer {
         MemberServer { addr, inner }
     }
 
-    pub fn serve(state: Arc<State>, addr: &SocketAddr) -> impl Future<Item = (), Error = ()> {
+    pub fn serve(
+        state: Arc<State>,
+        addr: &SocketAddr,
+    ) -> impl Future<Item = (), Error = std::io::Error> {
         let new_service = server::MemberServer::new(MemberServer::new(addr.clone(), state));
         let mut h2 = Server::new(new_service, Default::default(), DefaultExecutor::current());
 
@@ -40,7 +43,6 @@ impl MemberServer {
                 tokio::spawn(fut);
                 Ok(())
             })
-            .map_err(|err| error!("server error: {:?}", err))
     }
 }
 

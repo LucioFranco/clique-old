@@ -77,3 +77,38 @@ impl server::Member for MemberServer {
         }))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use {
+        super::MemberServer,
+        crate::{
+            rpc::proto::{server::Member, Peer, Push},
+            state::State,
+        },
+        futures::Future,
+        std::sync::Arc,
+        tower_grpc::Request,
+        uuid::Uuid,
+    };
+
+    #[test]
+    fn join() {
+        let addr = "127.0.0.1:1234".to_string();
+        let state = Arc::new(State::new());
+        let mut server = MemberServer::new(addr.parse().unwrap(), state);
+
+        let from = Peer {
+            id: Uuid::new_v4().to_string(),
+            address: addr,
+        };
+
+        let request = Request::new(Push {
+            from: Some(from.clone()),
+            peers: vec![from.clone()],
+        });
+
+        let response = server.join(request).wait().unwrap();
+        assert_eq!(response.into_inner().peers, vec![from]);
+    }
+}

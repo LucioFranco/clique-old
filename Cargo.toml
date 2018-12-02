@@ -2,7 +2,7 @@
 name = "clique"
 version = "0.1.0"
 authors = ["Lucio Franco <luciofranco14@gmail.com>"]
-description = "A SWIM based gossip library"
+description = "A SWIM based gossip agent and library"
 
 edition = "2018"
 

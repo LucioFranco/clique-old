@@ -14,6 +14,13 @@ repository = "https://github.com/LucioFranco/clique"
 [badges]
 travis-ci = { repository = "LucioFranco/clique", branch = "master" }
 
+[[bin]]
+name = "clique-agent"
+path = "src/bin/agent.rs"
+
+[lib]
+path = "src/lib.rs"
+
 [dependencies]
 futures = "0.1"
 futures-util-preview = "0.3.0-alpha.10"

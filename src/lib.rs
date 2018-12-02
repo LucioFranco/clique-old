@@ -17,5 +17,5 @@ mod peer;
 mod rpc;
 mod state;
 
-pub use crate::error::Error;
+pub use crate::error::{Error, Result};
 pub use crate::node::Node;

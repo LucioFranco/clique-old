@@ -1,6 +1,7 @@
 use {
     crate::{
         codec::{Msg, MsgCodec},
+        error::Result,
         rpc::{
             client,
             proto::{Peer, Push},
@@ -37,7 +38,7 @@ impl Node {
         }
     }
 
-    pub async fn join(&self, peers: Vec<SocketAddr>) -> Result<(), crate::error::Error> {
+    pub async fn join(&self, peers: Vec<SocketAddr>) -> Result<()> {
         // TODO: add proper address selection process
         let join_addr = peers.into_iter().next().expect("One addrs required");
 
@@ -90,7 +91,7 @@ impl Node {
         Ok(())
     }
 
-    pub async fn serve(&self) -> Result<(), std::io::Error> {
+    pub async fn serve(&self) -> Result<()> {
         let (tx, rx) = mpsc::channel(1000);
         let socket = UdpSocket::bind(&self.addr)?;
 
@@ -125,9 +126,7 @@ impl Node {
                 trace!("Received: {:?}", msg);
                 let tx = tx.clone();
 
-                if let Err(e) = await!(self.process_message(tx, msg)) {
-                    error!("Receiving message: {}", e);
-                }
+                await!(self.process_message(tx, msg));
             }
         };
 
@@ -148,7 +147,7 @@ impl Node {
         &self,
         mut tx: Sender<(Msg, SocketAddr)>,
         (msg, addr): (Msg, SocketAddr),
-    ) -> Result<(), mpsc::SendError<(Msg, SocketAddr)>> {
+    ) {
         match msg {
             Msg::Ping(broadcasts) => {
                 self.inner.apply_broadcasts(broadcasts);
@@ -159,14 +158,15 @@ impl Node {
                 };
 
                 let msg = (ack, addr);
-                await!(tx.send_async(msg))
+                if let Err(e) = await!(tx.send_async(msg)) {
+                    error!("Error sending ack: {}", e);
+                }
             }
 
             Msg::Ack(broadcasts) => {
                 self.inner.apply_broadcasts(broadcasts);
-                Ok(())
             }
-        }
+        };
     }
 
     async fn gossip(&self, tx: Sender<(Msg, SocketAddr)>) {

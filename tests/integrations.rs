@@ -11,6 +11,7 @@ fn join() {
         let node_a = Node::new(node_a_addr.parse().unwrap());
         tokio::spawn_async(async move { await!(node_a.serve()).unwrap() });
 
+        // Sleep to let node_a start its rpc server
         await!(sleep_ms(500));
 
         let node_b = Node::new("127.0.0.1:7879".parse().unwrap());

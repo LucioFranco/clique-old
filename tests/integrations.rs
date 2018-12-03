@@ -19,10 +19,10 @@ fn join() {
         tokio::spawn_async(async move { await!(node_b.serve()).unwrap() });
     };
 
-    run_test(fut)
+    test(fut)
 }
 
-fn run_test<F>(fut: F)
+fn test<F>(fut: F)
 where
     F: futures::Future<Output = ()> + Send + 'static,
 {

@@ -1,6 +1,6 @@
 //! # Clique
 //!
-//! A SWIM based gossip protocol library. Coming soon.
+//! A SWIM based gossip protocol agent and library. Coming soon.
 
 #![feature(pin, async_await, await_macro, futures_api)]
 

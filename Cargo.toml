@@ -22,8 +22,8 @@ path = "src/bin/agent.rs"
 path = "src/lib.rs"
 
 [dependencies]
-futures = "0.1"
-futures-util-preview = "0.3.0-alpha.10"
+futures01 = { package = "futures", version = "0.1", optional = true }
+futures-preview = { version = "0.3.0-alpha.10", features = ["tokio-compat"] }
 bytes = "0.4"
 indexmap = "1.0"
 serde = "1.0"

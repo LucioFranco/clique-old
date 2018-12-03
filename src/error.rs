@@ -1,5 +1,6 @@
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub enum Error {
     Grpc(tower_grpc::Error<tower_h2::client::Error>),
     Io(std::io::Error),

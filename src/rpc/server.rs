@@ -3,11 +3,13 @@ use {
         rpc::proto::{server, Peer, Pull, Push},
         state::State,
     },
-    futures::{future, Future, Stream},
     log::{error, info, trace},
     std::{net::SocketAddr, sync::Arc},
-    tokio::executor::DefaultExecutor,
-    tokio::net::TcpListener,
+    tokio::{
+        executor::DefaultExecutor,
+        net::TcpListener,
+        prelude::{future, Future, Stream},
+    },
     tower_grpc::{Request, Response},
     tower_h2::Server,
     uuid::Uuid,
@@ -71,7 +73,7 @@ impl server::Member for MemberServer {
             address: self.addr.to_string(),
         };
 
-        futures::future::ok(Response::new(Pull {
+        future::ok(Response::new(Pull {
             from: Some(current_peer),
             peers,
         }))
@@ -86,8 +88,8 @@ mod test {
             rpc::proto::{server::Member, Peer, Push},
             state::State,
         },
-        futures::Future,
         std::sync::Arc,
+        tokio::prelude::Future,
         tower_grpc::Request,
         uuid::Uuid,
     };

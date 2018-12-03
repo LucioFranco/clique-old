@@ -10,15 +10,14 @@ use {
         state::{NodeState, State},
     },
     futures::{
-        sync::mpsc::{self, Receiver, Sender},
-        Sink, Stream,
+        channel::mpsc::{self, Receiver, Sender},
+        compat::Stream01CompatExt,
+        join, SinkExt, StreamExt,
     },
-    futures_util::join,
     log::{error, info, trace},
     std::{net::SocketAddr, sync::Arc, time::Duration},
     tokio::{
         net::{UdpFramed, UdpSocket},
-        prelude::*,
         timer::Interval,
     },
     tower_grpc::Request,
@@ -119,7 +118,14 @@ impl Node {
     ) {
         info!("Listening on: {}", self.addr);
 
-        let (mut sink, mut stream) = UdpFramed::new(socket, MsgCodec).split();
+        let (mut sink, mut stream) = {
+            use tokio::prelude::Stream;
+            let framed = UdpFramed::new(socket, MsgCodec);
+
+            let (sink, stream) = framed.split();
+
+            (sink, stream.compat())
+        };
 
         let message_receiver = async {
             while let Some(Ok(msg)) = await!(stream.next()) {
@@ -131,7 +137,8 @@ impl Node {
         };
 
         let message_sender = async {
-            while let Some(Ok(msg)) = await!(rx.next()) {
+            use tokio::prelude::SinkExt;
+            while let Some(msg) = await!(rx.next()) {
                 trace!("Sending: {:?} to: {:?}", msg.0, msg.1);
 
                 if let Err(e) = await!(sink.send_async(msg)) {
@@ -158,7 +165,7 @@ impl Node {
                 };
 
                 let msg = (ack, addr);
-                if let Err(e) = await!(tx.send_async(msg)) {
+                if let Err(e) = await!(tx.send(msg)) {
                     error!("Error sending ack: {}", e);
                 }
             }
@@ -170,7 +177,7 @@ impl Node {
     }
 
     async fn gossip(&self, tx: Sender<(Msg, SocketAddr)>) {
-        let mut interval = Interval::new_interval(Duration::from_secs(1));
+        let mut interval = Interval::new_interval(Duration::from_secs(1)).compat();
 
         while let Some(_) = await!(interval.next()) {
             // Take a snapshot of the current set of peers
@@ -189,7 +196,7 @@ impl Node {
                 .collect::<Vec<_>>();
 
             for heartbeat in heartbeats {
-                let tx = tx.clone();
+                let mut tx = tx.clone();
                 await!(tx.send(heartbeat)).expect("Unable to send heartbeat");
             }
         }

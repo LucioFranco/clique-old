@@ -15,7 +15,7 @@ repository = "https://github.com/LucioFranco/clique"
 travis-ci = { repository = "LucioFranco/clique", branch = "master" }
 
 [[bin]]
-name = "clique-agent"
+name = "agent"
 path = "src/bin/agent.rs"
 
 [lib]

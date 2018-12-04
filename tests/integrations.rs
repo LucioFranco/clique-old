@@ -21,11 +21,11 @@ async fn join() {
 }
 
 async fn sleep_ms(ms: u64) {
-    use futures::compat::Future01CompatExt;
+    use tokio::await;
     use std::time::{Duration, Instant};
     use tokio::timer::Delay;
 
     let when = Instant::now() + Duration::from_millis(ms);
 
-    await!(Delay::new(when).compat()).expect("Error running sleep");
+    await!(Delay::new(when)).expect("Error running sleep");
 }

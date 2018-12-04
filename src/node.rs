@@ -11,14 +11,16 @@ use {
     },
     futures::{
         channel::mpsc::{self, Receiver, Sender},
-        compat::Stream01CompatExt,
         join, SinkExt, StreamExt,
+        future::{FutureExt, TryFutureExt}
     },
     log::{error, info, trace},
     std::{net::SocketAddr, sync::Arc, time::Duration},
     tokio::{
         net::{UdpFramed, UdpSocket},
         timer::Interval,
+        prelude::{SinkExt as OtherSinkExt, StreamAsyncExt, Stream},
+        await
     },
     tower_grpc::Request,
     uuid::Uuid,
@@ -99,8 +101,9 @@ impl Node {
         let udp_listener = self.listen_udp(socket, (tx.clone(), rx));
         let tcp_listener = self.listen_tcp(addr.clone());
         let gossiper = self.gossip(tx);
+        let failures = self.failures(Duration::from_secs(1));
 
-        join!(tcp_listener, udp_listener, gossiper);
+        join!(tcp_listener, udp_listener, gossiper, failures);
 
         Ok(())
     }
@@ -118,14 +121,10 @@ impl Node {
     ) {
         info!("Listening on: {}", self.addr);
 
-        let (mut sink, mut stream) = {
-            use tokio::prelude::Stream;
-            let framed = UdpFramed::new(socket, MsgCodec);
 
-            let (sink, stream) = framed.split();
+        let framed = UdpFramed::new(socket, MsgCodec);
 
-            (sink, stream.compat())
-        };
+        let (mut sink, mut stream) = framed.split();
 
         let message_receiver = async {
             while let Some(Ok(msg)) = await!(stream.next()) {
@@ -137,8 +136,7 @@ impl Node {
         };
 
         let message_sender = async {
-            use tokio::prelude::SinkExt;
-            while let Some(msg) = await!(rx.next()) {
+            while let Ok(Some(msg)) = await!(rx.next().unit_error().boxed().compat()) {
                 trace!("Sending: {:?} to: {:?}", msg.0, msg.1);
 
                 if let Err(e) = await!(sink.send_async(msg)) {
@@ -156,12 +154,12 @@ impl Node {
         (msg, addr): (Msg, SocketAddr),
     ) {
         match msg {
-            Msg::Ping(broadcasts) => {
+            Msg::Ping(seq, broadcasts) => {
                 self.inner.apply_broadcasts(broadcasts);
 
                 let ack = {
                     let broadcasts = self.inner.broadcasts_mut().drain();
-                    Msg::Ack(broadcasts)
+                    Msg::Ack(seq, broadcasts)
                 };
 
                 let msg = (ack, addr);
@@ -170,14 +168,16 @@ impl Node {
                 }
             }
 
-            Msg::Ack(broadcasts) => {
+            Msg::Ack(seq, broadcasts) => {
+                self.inner.failures_mut().handle_ack(&seq);
                 self.inner.apply_broadcasts(broadcasts);
             }
         };
     }
 
     async fn gossip(&self, tx: Sender<(Msg, SocketAddr)>) {
-        let mut interval = Interval::new_interval(Duration::from_secs(1)).compat();
+        use tokio::prelude::StreamAsyncExt;
+        let mut interval = Interval::new_interval(Duration::from_secs(1));
 
         while let Some(_) = await!(interval.next()) {
             // Take a snapshot of the current set of peers
@@ -185,19 +185,47 @@ impl Node {
 
             trace!("Sending heartbeats");
 
-            let broadcasts = self.inner.broadcasts_mut().drain().clone();
+            let broadcasts = {
+                // This acquires a lock so we need to make sure it gets dropped
+                // before any `await!`.
+                let mut broadcasts = self.inner.broadcasts_mut();
+                broadcasts.drain()
+            };
 
             let heartbeats = peers
                 .iter()
-                .map(move |(_id, peer)| {
-                    let ping = Msg::Ping(broadcasts.clone());
-                    (ping, peer.addr())
-                })
                 .collect::<Vec<_>>();
 
-            for heartbeat in heartbeats {
+            let pings = {
+                let mut msg = Vec::new();
+                let mut failures = self.inner.failures_mut();
+
+                for (_, peer) in heartbeats {
+                    let addr = peer.addr();
+                    let seq_num = failures.add(addr.clone());
+                    msg.push((Msg::Ping(seq_num, broadcasts.clone()), addr));
+                }
+                msg
+            };
+
+            for ping in pings {
                 let mut tx = tx.clone();
-                await!(tx.send(heartbeat)).expect("Unable to send heartbeat");
+                await!(tx.send(ping)).expect("Unable to send ping");
+            }
+        }
+    }
+
+    async fn failures(&self, interval: Duration) {
+        let mut interval = Interval::new_interval(interval);
+
+        while let Some(_) = await!(interval.next()) {
+            let failed_nodes = {
+                let mut failures = self.inner.failures_mut();
+                failures.gather()
+            };
+            
+            if !failed_nodes.is_empty() {
+                info!("Timeouts: {:?}", failed_nodes);
             }
         }
     }

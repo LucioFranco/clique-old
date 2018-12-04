@@ -1,5 +1,5 @@
 use {
-    crate::broadcasts::Broadcast,
+    crate::{broadcasts::Broadcast, failure::SeqNum},
     bytes::{BufMut, BytesMut},
     serde_derive::{Deserialize, Serialize},
     tokio::codec::{Decoder, Encoder},
@@ -7,8 +7,8 @@ use {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Msg {
-    Ping(Vec<Broadcast>),
-    Ack(Vec<Broadcast>),
+    Ping(SeqNum, Vec<Broadcast>),
+    Ack(SeqNum, Vec<Broadcast>),
 }
 
 pub struct MsgCodec;

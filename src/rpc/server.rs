@@ -48,9 +48,9 @@ impl server::Member for MemberServer {
     type JoinFuture = future::FutureResult<Response<Pull>, tower_grpc::Error>;
 
     fn join(&mut self, request: Request<Push>) -> Self::JoinFuture {
-        info!("Join Request: {:?}", request);
-
         let from = request.into_inner().from.unwrap();
+
+        info!("Join Request: {}:{}", from.id, from.address);
 
         let from_id = Uuid::parse_str(from.id.as_str()).unwrap();
         let from_addr = from.address.parse().unwrap();

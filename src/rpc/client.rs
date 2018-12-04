@@ -2,7 +2,7 @@ use {
     crate::rpc::proto::client::Member,
     http::Uri,
     std::net::SocketAddr,
-    tokio::{executor::DefaultExecutor, net::TcpStream},
+    tokio::{await, executor::DefaultExecutor, net::TcpStream},
     tower_grpc::BoxBody,
     tower_h2::client::Connection,
     tower_http::{add_origin, AddOrigin},

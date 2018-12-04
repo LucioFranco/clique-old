@@ -1,6 +1,7 @@
 use {
     crate::{
         broadcasts::{Broadcast, Broadcasts},
+        failure::Failure,
         peer::Peer,
     },
     indexmap::IndexMap,
@@ -8,6 +9,7 @@ use {
     std::{
         net::SocketAddr,
         sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+        time::Duration,
     },
     uuid::Uuid,
 };
@@ -24,6 +26,7 @@ pub struct State {
     peers: RwLock<IndexMap<Uuid, Peer>>,
     state: RwLock<NodeState>,
     broadcasts: RwLock<Broadcasts>,
+    failures: RwLock<Failure>,
 }
 
 impl State {
@@ -33,6 +36,7 @@ impl State {
             peers: RwLock::new(IndexMap::new()),
             state: RwLock::new(NodeState::Disconnected),
             broadcasts: RwLock::new(Broadcasts::new()),
+            failures: RwLock::new(Failure::new(Duration::from_secs(2))),
         }
     }
 
@@ -42,6 +46,10 @@ impl State {
 
     pub fn id(&self) -> RwLockReadGuard<'_, Uuid> {
         self.id.read().expect("Unable to acquire read lock for id")
+    }
+
+    pub fn failures_mut(&self) -> RwLockWriteGuard<'_, Failure> {
+        self.failures.write().expect("Unable to get failureslock")
     }
 
     pub fn update_state(&self, state: NodeState) {

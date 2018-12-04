@@ -21,8 +21,8 @@ async fn join() {
 }
 
 async fn sleep_ms(ms: u64) {
-    use tokio::await;
     use std::time::{Duration, Instant};
+    use tokio::await;
     use tokio::timer::Delay;
 
     let when = Instant::now() + Duration::from_millis(ms);

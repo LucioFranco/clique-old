@@ -11,16 +11,16 @@ use {
     },
     futures::{
         channel::mpsc::{self, Receiver, Sender},
+        future::{FutureExt, TryFutureExt},
         join, SinkExt, StreamExt,
-        future::{FutureExt, TryFutureExt}
     },
     log::{error, info, trace},
     std::{net::SocketAddr, sync::Arc, time::Duration},
     tokio::{
+        await,
         net::{UdpFramed, UdpSocket},
+        prelude::{SinkExt as OtherSinkExt, Stream, StreamAsyncExt},
         timer::Interval,
-        prelude::{SinkExt as OtherSinkExt, StreamAsyncExt, Stream},
-        await
     },
     tower_grpc::Request,
     uuid::Uuid,
@@ -121,7 +121,6 @@ impl Node {
     ) {
         info!("Listening on: {}", self.addr);
 
-
         let framed = UdpFramed::new(socket, MsgCodec);
 
         let (mut sink, mut stream) = framed.split();
@@ -192,9 +191,7 @@ impl Node {
                 broadcasts.drain()
             };
 
-            let heartbeats = peers
-                .iter()
-                .collect::<Vec<_>>();
+            let heartbeats = peers.iter().collect::<Vec<_>>();
 
             let pings = {
                 let mut msg = Vec::new();
@@ -223,7 +220,7 @@ impl Node {
                 let mut failures = self.inner.failures_mut();
                 failures.gather()
             };
-            
+
             if !failed_nodes.is_empty() {
                 info!("Timeouts: {:?}", failed_nodes);
             }

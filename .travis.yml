@@ -17,9 +17,8 @@ matrix:
   include:
     - rust: nightly
       script:
-        - rustup component add rustfmt-preview
+        - rustup component add rustfmt
         - cargo fmt -- --check
   
 script:
   - cargo test --all --all-features --locked
-

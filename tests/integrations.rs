@@ -2,11 +2,14 @@
 
 extern crate tokio_async_await_test;
 
-use clique::Node;
-use futures::compat::Future01CompatExt;
-use futures::compat::TokioDefaultSpawner;
-use futures::task::SpawnExt;
-use tokio_async_await_test::async_test;
+use {
+    clique::Node,
+    futures::{
+        compat::{Future01CompatExt, TokioDefaultSpawner},
+        task::SpawnExt,
+    },
+    tokio_async_await_test::async_test,
+};
 
 #[async_test]
 async fn join() {

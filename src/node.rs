@@ -117,7 +117,7 @@ impl Node {
     async fn listen_udp(
         &self,
         socket: UdpSocket,
-        (tx, mut rx): (Sender<(Msg, SocketAddr)>, Receiver<(Msg, SocketAddr)>),
+        (tx, rx): (Sender<(Msg, SocketAddr)>, Receiver<(Msg, SocketAddr)>),
     ) {
         info!("Listening on: {}", self.addr);
 
@@ -129,6 +129,7 @@ impl Node {
         };
         pin_mut!(sink);
         pin_mut!(stream);
+        pin_mut!(rx);
 
         let message_receiver = async {
             while let Some(Ok(msg)) = await!(stream.next()) {
@@ -140,12 +141,8 @@ impl Node {
         };
 
         let message_sender = async {
-            while let Some(msg) = await!(rx.next()) {
-                trace!("Sending: {:?} to: {:?}", msg.0, msg.1);
-
-                if let Err(e) = await!(sink.send(msg)) {
-                    error!("Sending message: {}", e);
-                }
+            if let Err(e) = await!(sink.send_all(&mut rx)) {
+                error!("Sending message: {}", e);
             }
         };
 

@@ -1,9 +1,8 @@
 #![feature(pin, await_macro, async_await, futures_api)]
 
-use futures::future::{FutureExt, TryFutureExt};
-
 use {
     clique::Node,
+    futures::future::{FutureExt, TryFutureExt},
     log::{error, info},
     std::{net::SocketAddr, sync::Arc},
 };

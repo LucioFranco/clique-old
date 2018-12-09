@@ -1,10 +1,8 @@
 #![feature(pin, await_macro, async_await, futures_api)]
 
-#[macro_use]
-extern crate tokio;
-
 use {
     clique::Node,
+    futures::future::{FutureExt, TryFutureExt},
     log::{error, info},
     std::{net::SocketAddr, sync::Arc},
 };
@@ -22,9 +20,9 @@ fn main() {
     pretty_env_logger::init();
 
     // Bootstrap lazy future to allow us to call spawn
-    let server = run(local_addr, peer_addr);
+    let server = run(local_addr, peer_addr).unit_error().boxed().compat();
 
-    tokio::run_async(server);
+    tokio::run(server);
 }
 
 async fn run(local_addr: SocketAddr, peer_addr: Option<String>) {

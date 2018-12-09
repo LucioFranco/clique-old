@@ -22,7 +22,8 @@ path = "src/bin/agent.rs"
 path = "src/lib.rs"
 
 [dependencies]
-futures-preview = { version = "0.3.0-alpha.10", features = ["tokio-compat"] }
+futures-preview = { git = "https://github.com/LucioFranco/futures-rs", features = ["tokio-compat"] }
+pin-utils = "0.1.0-alpha.3"
 bytes = "0.4"
 indexmap = "1.0"
 serde = "1.0"

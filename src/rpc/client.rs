@@ -1,5 +1,6 @@
 use {
     crate::rpc::proto::client::Member,
+    futures::compat::Future01CompatExt,
     http::Uri,
     std::net::SocketAddr,
     tokio::{executor::DefaultExecutor, net::TcpStream},
@@ -7,8 +8,6 @@ use {
     tower_h2::client::Connection,
     tower_http::{add_origin, AddOrigin},
 };
-
-use futures::compat::Future01CompatExt;
 
 #[allow(dead_code)]
 pub type Client = Member<AddOrigin<Connection<TcpStream, DefaultExecutor, BoxBody>>>;

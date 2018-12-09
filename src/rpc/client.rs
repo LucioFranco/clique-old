@@ -2,20 +2,22 @@ use {
     crate::rpc::proto::client::Member,
     http::Uri,
     std::net::SocketAddr,
-    tokio::{await, executor::DefaultExecutor, net::TcpStream},
+    tokio::{executor::DefaultExecutor, net::TcpStream},
     tower_grpc::BoxBody,
     tower_h2::client::Connection,
     tower_http::{add_origin, AddOrigin},
 };
 
+use futures::compat::Future01CompatExt;
+
 #[allow(dead_code)]
 pub type Client = Member<AddOrigin<Connection<TcpStream, DefaultExecutor, BoxBody>>>;
 
 pub async fn connect(addr: &SocketAddr, origin: Uri) -> Result<Client, ()> {
-    let socket = await!(TcpStream::connect(addr)).expect("Unable to create the TcpStream");
+    let socket = await!(TcpStream::connect(addr).compat()).expect("Unable to create the TcpStream");
 
     let conn = {
-        let conn = await!(Connection::handshake(socket, DefaultExecutor::current()))
+        let conn = await!(Connection::handshake(socket, DefaultExecutor::current()).compat())
             .expect("Unable to create the connection");
 
         add_origin::Builder::new()

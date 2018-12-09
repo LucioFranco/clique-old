@@ -11,15 +11,15 @@ use {
     },
     futures::{
         channel::mpsc::{self, Receiver, Sender},
-        future::{FutureExt, TryFutureExt},
+        compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
         join, SinkExt, StreamExt,
     },
     log::{error, info, trace},
+    pin_utils::pin_mut,
     std::{net::SocketAddr, sync::Arc, time::Duration},
     tokio::{
-        await,
         net::{UdpFramed, UdpSocket},
-        prelude::{SinkExt as OtherSinkExt, Stream, StreamAsyncExt},
+        prelude::Stream as Stream01,
         timer::Interval,
     },
     tower_grpc::Request,
@@ -64,7 +64,7 @@ impl Node {
             peers: vec![from],
         }));
 
-        let response = await!(request)?;
+        let response = await!(request.compat())?;
 
         let peers = {
             let body = response.into_inner();
@@ -109,7 +109,7 @@ impl Node {
     }
 
     async fn listen_tcp(&self, addr: SocketAddr) {
-        if let Err(e) = await!(MemberServer::serve(self.inner.clone(), &addr)) {
+        if let Err(e) = await!(MemberServer::serve(self.inner.clone(), &addr).compat()) {
             error!("Error listening for rpc calls: {}", e);
         }
     }
@@ -123,7 +123,12 @@ impl Node {
 
         let framed = UdpFramed::new(socket, MsgCodec);
 
-        let (mut sink, mut stream) = framed.split();
+        let (sink, stream) = {
+            let (sink, stream) = framed.split();
+            (sink.compat(), stream.compat())
+        };
+        pin_mut!(sink);
+        pin_mut!(stream);
 
         let message_receiver = async {
             while let Some(Ok(msg)) = await!(stream.next()) {
@@ -135,10 +140,10 @@ impl Node {
         };
 
         let message_sender = async {
-            while let Ok(Some(msg)) = await!(rx.next().unit_error().boxed().compat()) {
+            while let Some(msg) = await!(rx.next()) {
                 trace!("Sending: {:?} to: {:?}", msg.0, msg.1);
 
-                if let Err(e) = await!(sink.send_async(msg)) {
+                if let Err(e) = await!(sink.send(msg)) {
                     error!("Sending message: {}", e);
                 }
             }
@@ -213,7 +218,7 @@ impl Node {
     }
 
     async fn failures(&self, interval: Duration) {
-        let mut interval = Interval::new_interval(interval);
+        let mut interval = Interval::new_interval(interval).compat();
 
         while let Some(_) = await!(interval.next()) {
             let failed_nodes = {

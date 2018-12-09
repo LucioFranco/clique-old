@@ -14,11 +14,11 @@ rust:
  # Allow for occasional compiler breakage on nightly Rust.
 matrix:
   fast_finish: true
-  include:
-    - rust: nightly
-      script:
-        - rustup component add rustfmt
-        - cargo fmt -- --check
+  # include:
+  #   - rust: nightly
+  #     script:
+  #       - rustup component add rustfmt
+  #       - cargo fmt -- --check
   
 script:
   - cargo test --all --all-features --locked

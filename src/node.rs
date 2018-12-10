@@ -125,7 +125,7 @@ impl Node {
 
         let (sink, stream) = {
             let (sink, stream) = framed.split();
-            (sink.compat(), stream.compat())
+            (sink.compat_sink(), stream.compat())
         };
         pin_mut!(sink);
         pin_mut!(stream);

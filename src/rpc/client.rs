@@ -1,5 +1,5 @@
 use {
-    crate::rpc::proto::client::Member,
+    clique_proto::client::Member,
     futures::compat::Future01CompatExt,
     http::Uri,
     std::net::SocketAddr,

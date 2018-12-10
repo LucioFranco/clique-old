@@ -4,11 +4,6 @@
 
 #![feature(pin, async_await, await_macro, futures_api)]
 
-#[macro_use]
-extern crate prost_derive;
-
-extern crate tokio;
-
 mod broadcasts;
 mod codec;
 mod error;

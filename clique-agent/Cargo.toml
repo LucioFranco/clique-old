@@ -1,0 +1,16 @@
+[package]
+name = "clique-agent"
+version = "0.1.0"
+authors = ["Lucio Franco <luciofranco14@gmail.com>"]
+edition = "2018"
+
+[[bin]]
+name = "agent"
+path = "src/main.rs"
+
+[dependencies]
+futures-preview = { git = "https://github.com/LucioFranco/futures-rs", features = ["tokio-compat"] }
+log = "0.4"
+tokio = { version = "0.1", features = ["async-await-preview"] }
+pretty_env_logger = "0.2"
+clique = { path = ".." }

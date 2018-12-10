@@ -4,11 +4,11 @@ use {
         error::Result,
         rpc::{
             client,
-            proto::{Peer, Push},
             server::MemberServer,
         },
         state::{NodeState, State},
     },
+    clique_proto::{Peer, Push},
     futures::{
         channel::mpsc::{self, Receiver, Sender},
         compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},

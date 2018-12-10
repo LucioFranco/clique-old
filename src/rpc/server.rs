@@ -1,7 +1,5 @@
 use {
-    crate::{
-        state::State,
-    },
+    crate::state::State,
     clique_proto::{server, Peer, Pull, Push},
     futures::future::{FutureExt, TryFutureExt},
     log::{error, info, trace},
@@ -107,18 +105,17 @@ pub async fn join(
 mod test {
     use {
         super::MemberServer,
-        crate::{
-            rpc::proto::{server::Member, Peer, Push},
-            state::State,
-        },
+        crate::state::State,
+        clique_proto::{server::Member, Peer, Push},
+        futures::compat::Future01CompatExt,
         std::sync::Arc,
-        tokio::prelude::Future,
+        tokio_async_await_test::async_test,
         tower_grpc::Request,
         uuid::Uuid,
     };
 
-    #[test]
-    fn join() {
+    #[async_test]
+    async fn join() {
         let addr = "127.0.0.1:1234".to_string();
         let state = Arc::new(State::new());
         let mut server = MemberServer::new(addr.parse().unwrap(), state);
@@ -133,7 +130,7 @@ mod test {
             peers: vec![from.clone()],
         });
 
-        let response = server.join(request).wait().unwrap();
+        let response = await!(server.join(request).compat()).unwrap();
         assert_eq!(response.into_inner().peers, vec![from]);
     }
 }

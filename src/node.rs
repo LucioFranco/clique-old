@@ -2,10 +2,7 @@ use {
     crate::{
         codec::{Msg, MsgCodec},
         error::Result,
-        rpc::{
-            client,
-            server::MemberServer,
-        },
+        rpc::{client::Client, server::MemberServer},
         state::{NodeState, State},
     },
     clique_proto::{Peer, Push},
@@ -22,7 +19,6 @@ use {
         prelude::Stream as Stream01,
         timer::Interval,
     },
-    tower_grpc::Request,
     uuid::Uuid,
 };
 
@@ -52,22 +48,22 @@ impl Node {
 
         let id = await!(self.inner.id().lock()).to_string();
 
-        let mut client = await!(client::connect(&join_addr, uri)).unwrap();
+        let mut client = await!(Client::connect(&join_addr, uri))?;
 
         let from = Peer {
             id: id.to_string(),
             address: from_address.to_string(),
         };
 
-        let request = client.join(Request::new(Push {
+        let push = Push {
             from: Some(from.clone()),
             peers: vec![from],
-        }));
+        };
 
-        let response = await!(request.compat())?;
+        let response = await!(client.join(push))?;
 
         let peers = {
-            let body = response.into_inner();
+            let body = response;
             let from = body.from.unwrap();
 
             info!(

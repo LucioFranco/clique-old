@@ -3,12 +3,13 @@ use {
         rpc::proto::{server, Peer, Pull, Push},
         state::State,
     },
+    futures::future::{FutureExt, TryFutureExt},
     log::{error, info, trace},
     std::{net::SocketAddr, sync::Arc},
     tokio::{
         executor::DefaultExecutor,
         net::TcpListener,
-        prelude::{future, Future, Stream},
+        prelude::{Future, Stream},
     },
     tower_grpc::{Request, Response},
     tower_h2::Server,
@@ -45,39 +46,61 @@ impl MemberServer {
 }
 
 impl server::Member for MemberServer {
-    type JoinFuture = future::FutureResult<Response<Pull>, tower_grpc::Error>;
+    type JoinFuture =
+        Box<dyn Future<Item = Response<Pull>, Error = tower_grpc::Error> + Send + 'static>;
 
     fn join(&mut self, request: Request<Push>) -> Self::JoinFuture {
-        let from = request.into_inner().from.unwrap();
+        let inner = self.inner.clone();
+        let addr = self.addr.clone();
 
-        info!("Join Request: {}:{}", from.id, from.address);
+        let fut = async move { await!(join(inner, request, addr)).unwrap() };
 
-        let from_id = Uuid::parse_str(from.id.as_str()).unwrap();
-        let from_addr = from.address.parse().unwrap();
-        self.inner.peer_join(from_id, from_addr);
+        Box::new(
+            fut.unit_error()
+                .boxed()
+                .compat()
+                .map_err(|e| tower_grpc::Error::Inner(e)),
+        )
+    }
+}
 
-        let peers = self
-            .inner
-            .peers()
+pub async fn join(
+    inner: Arc<State>,
+    request: Request<Push>,
+    addr: SocketAddr,
+) -> Result<Response<Pull>, ()> {
+    let from = request.into_inner().from.unwrap();
+
+    info!("Join Request: {}:{}", from.id, from.address);
+
+    let from_id = Uuid::parse_str(from.id.as_str()).unwrap();
+    let from_addr = from.address.parse().unwrap();
+
+    await!(inner.peer_join(from_id, from_addr));
+
+    let peers = {
+        let peers = await!(inner.peers().lock());
+
+        peers
             .iter()
             .map(|(id, peer)| Peer {
                 id: id.to_string(),
                 address: peer.addr().to_string(),
             })
-            .collect();
+            .collect()
+    };
 
-        trace!("Pushing these peers: {:?}", peers);
+    trace!("Pushing these peers: {:?}", peers);
 
-        let current_peer = Peer {
-            id: self.inner.id().to_string(),
-            address: self.addr.to_string(),
-        };
+    let current_peer = Peer {
+        id: await!(inner.id().lock()).to_string(),
+        address: addr.to_string(),
+    };
 
-        future::ok(Response::new(Pull {
-            from: Some(current_peer),
-            peers,
-        }))
-    }
+    Ok(Response::new(Pull {
+        from: Some(current_peer),
+        peers,
+    }))
 }
 
 #[cfg(test)]

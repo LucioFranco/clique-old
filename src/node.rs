@@ -50,7 +50,7 @@ impl Node {
 
         let from_address = local_addr.clone();
 
-        let id = self.inner.id().to_string();
+        let id = await!(self.inner.id().lock()).to_string();
 
         let mut client = await!(client::connect(&join_addr, uri)).unwrap();
 
@@ -86,8 +86,8 @@ impl Node {
                 .collect()
         };
 
-        self.inner.peers_sync(peers);
-        self.inner.update_state(NodeState::Connected);
+        await!(self.inner.peers_sync(peers));
+        await!(self.inner.update_state(NodeState::Connected));
 
         Ok(())
     }
@@ -142,7 +142,7 @@ impl Node {
 
         let message_sender = async {
             if let Err(e) = await!(sink.send_all(&mut rx)) {
-                error!("Sending message: {}", e);
+                error!("Error sending message: {}", e);
             }
         };
 
@@ -156,10 +156,11 @@ impl Node {
     ) {
         match msg {
             Msg::Ping(seq, broadcasts) => {
-                self.inner.apply_broadcasts(broadcasts);
+                await!(self.inner.apply_broadcasts(broadcasts));
 
                 let ack = {
-                    let broadcasts = self.inner.broadcasts_mut().drain();
+                    let mut broadcasts = await!(self.inner.broadcasts().lock());
+                    let broadcasts = broadcasts.drain();
                     Msg::Ack(seq, broadcasts)
                 };
 
@@ -170,8 +171,10 @@ impl Node {
             }
 
             Msg::Ack(seq, broadcasts) => {
-                self.inner.failures_mut().handle_ack(&seq);
-                self.inner.apply_broadcasts(broadcasts);
+                let failures = self.inner.failures();
+                let mut failures = await!(failures.lock());
+                failures.handle_ack(&seq);
+                await!(self.inner.apply_broadcasts(broadcasts));
             }
         };
     }
@@ -181,23 +184,24 @@ impl Node {
         let mut interval = Interval::new_interval(Duration::from_secs(1));
 
         while let Some(_) = await!(interval.next()) {
-            // Take a snapshot of the current set of peers
-            let peers = self.inner.peers().clone();
-
             trace!("Sending heartbeats");
 
             let broadcasts = {
                 // This acquires a lock so we need to make sure it gets dropped
                 // before any `await!`.
-                let mut broadcasts = self.inner.broadcasts_mut();
+                let mut broadcasts = await!(self.inner.broadcasts().lock());
                 broadcasts.drain()
             };
 
-            let heartbeats = peers.iter().collect::<Vec<_>>();
+            let heartbeats = {
+                let peers = await!(self.inner.peers().lock());
+                peers.clone().into_iter().collect::<Vec<_>>()
+            };
 
             let pings = {
                 let mut msg = Vec::new();
-                let mut failures = self.inner.failures_mut();
+                let failures = self.inner.failures();
+                let mut failures = await!(failures.lock());
 
                 for (_, peer) in heartbeats {
                     let addr = peer.addr();
@@ -219,11 +223,13 @@ impl Node {
 
         while let Some(_) = await!(interval.next()) {
             let failed_nodes = {
-                let mut failures = self.inner.failures_mut();
+                let failures = self.inner.failures();
+                let mut failures = await!(failures.lock());
                 failures.gather()
             };
 
             if !failed_nodes.is_empty() {
+                // TODO: change state for failed node
                 info!("Timeouts: {:?}", failed_nodes);
             }
         }

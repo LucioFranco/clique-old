@@ -1,6 +1,8 @@
 use {
-    crate::error::{Error, Result},
-    clique_proto::{client::Member, Pull, Push},
+    crate::{
+        error::{Error, Result},
+        rpc::proto::{client::Member, Pull, Push},
+    },
     futures::compat::Future01CompatExt,
     http::Uri,
     std::net::SocketAddr,

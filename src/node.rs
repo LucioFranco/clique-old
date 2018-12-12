@@ -3,10 +3,10 @@ use {
         codec::{Msg, MsgCodec},
         error::Result,
         peer::Peer,
+        rpc::proto::{Peer as PeerProto, Push},
         rpc::{client::Client, server::MemberServer},
         state::{NodeState, State},
     },
-    clique_proto::{Peer as PeerProto, Push},
     futures::{
         channel::mpsc::{self, Receiver, Sender},
         compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},

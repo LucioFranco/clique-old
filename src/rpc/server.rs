@@ -1,6 +1,8 @@
 use {
-    crate::state::State,
-    clique_proto::{server, Peer, Pull, Push},
+    crate::{
+        rpc::proto::{server, Peer, Pull, Push},
+        state::State,
+    },
     futures::future::{FutureExt, TryFutureExt},
     log::{error, info, trace},
     std::{net::SocketAddr, sync::Arc},

@@ -1,8 +1,13 @@
+/// A [Result] type that is wrapped to use the clique
+/// [Error] type.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Error type returned by `clique`.
 #[derive(Debug)]
 pub enum Error {
+    /// Errors returned from an RPC request.
     Grpc(tower_grpc::Error<tower_h2::client::Error>),
+    /// IO Errors that happen during IO operation.
     Io(std::io::Error),
 }
 

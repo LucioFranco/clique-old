@@ -23,12 +23,15 @@ use {
     uuid::Uuid,
 };
 
+/// `Node` is none thread safe representation of the current node. It maintains
+/// all the state within clique.
 pub struct Node {
     addr: SocketAddr,
     inner: Arc<State>,
 }
 
 impl Node {
+    /// Create a new `Node` that listens on the provided [SocketAddr]
     pub fn new(addr: SocketAddr) -> Self {
         Node {
             addr,
@@ -36,6 +39,9 @@ impl Node {
         }
     }
 
+    /// Get a snapshot of the current list of peers. This currently allocates a new
+    /// [HashMap] everytime its called to avoid lock contention. This function is
+    /// async due to it aquiring a lock.
     pub async fn peers(&self) -> HashMap<Uuid, Peer> {
         let peers = await!(self.inner.peers().lock());
         peers
@@ -44,6 +50,8 @@ impl Node {
             .collect::<HashMap<Uuid, Peer>>()
     }
 
+    /// Join the cluster via a list of Peers. Currently, only selects the
+    /// first node in the list.
     pub async fn join(&self, peers: Vec<SocketAddr>) -> Result<()> {
         // TODO: add proper address selection process
         let join_addr = peers.into_iter().next().expect("One addrs required");
@@ -97,6 +105,9 @@ impl Node {
         Ok(())
     }
 
+    /// Spawna long running future that will start both the listeners
+    /// on `TCP` and `UDP`. It will also start the gossiper and failure
+    /// detection portions of the application.
     pub async fn serve(&self) -> Result<()> {
         let (tx, rx) = mpsc::channel(1000);
         let socket = UdpSocket::bind(&self.addr)?;

@@ -32,7 +32,7 @@ impl State {
             id: Mutex::new(Uuid::new_v4()),
             peers: Mutex::new(IndexMap::new()),
             state: Mutex::new(NodeState::Disconnected),
-            broadcasts: Mutex::new(Broadcasts::new()),
+            broadcasts: Mutex::new(Broadcasts::default()),
             failures: Mutex::new(Failure::new(Duration::from_secs(2))),
         }
     }

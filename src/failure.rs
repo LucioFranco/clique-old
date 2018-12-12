@@ -29,9 +29,9 @@ impl Failure {
         next_seq
     }
 
-    pub fn handle_ack(&mut self, seq: &SeqNum) {
+    pub fn handle_ack(&mut self, seq: SeqNum) {
         // TODO: check that returning socketaddr matches
-        self.acks.remove(seq);
+        self.acks.remove(&seq);
     }
 
     /// Gather the set of nodes that have been suspected of failure

@@ -2,7 +2,7 @@
 //!
 //! A SWIM based gossip protocol agent and library. Coming soon.
 
-#![feature(pin, async_await, await_macro, futures_api)]
+#![feature(arbitrary_self_types, pin, async_await, await_macro, futures_api)]
 
 mod broadcasts;
 mod codec;

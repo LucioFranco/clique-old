@@ -9,6 +9,8 @@ pub enum Error {
     Grpc(tower_grpc::Error<tower_h2::client::Error>),
     /// IO Errors that happen during IO operation.
     Io(std::io::Error),
+    /// Uuid parsing errors
+    Uuid(uuid::parser::ParseError),
 }
 
 impl std::fmt::Display for Error {
@@ -16,6 +18,7 @@ impl std::fmt::Display for Error {
         match *self {
             Error::Grpc(ref inner) => write!(f, "Grpc Error: {}", inner),
             Error::Io(ref inner) => write!(f, "Io Error: {}", inner),
+            Error::Uuid(ref inner) => write!(f, "Uuid error: {}", inner),
         }
     }
 }
@@ -29,5 +32,11 @@ impl From<tower_grpc::Error<tower_h2::client::Error>> for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Error::Io(err)
+    }
+}
+
+impl From<uuid::parser::ParseError> for Error {
+    fn from(err: uuid::parser::ParseError) -> Self {
+        Error::Uuid(err)
     }
 }

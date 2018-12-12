@@ -1,15 +1,24 @@
 use {
     crate::{
+        error::Result,
         rpc::proto::{server, Peer, Pull, Push},
         state::State,
     },
-    futures::future::{FutureExt, TryFutureExt},
+    futures::{future::TryFutureExt},
     log::{error, info, trace},
-    std::{net::SocketAddr, sync::Arc},
+    pin_utils::unsafe_pinned,
+    std::{
+        future::Future,
+        marker::Unpin,
+        net::SocketAddr,
+        pin::Pin,
+        sync::Arc,
+        task::{LocalWaker, Poll},
+    },
     tokio::{
         executor::DefaultExecutor,
         net::TcpListener,
-        prelude::{Future, Stream},
+        prelude::{Future as Future01, Stream},
     },
     tower_grpc::{Request, Response},
     tower_h2::Server,
@@ -30,8 +39,8 @@ impl MemberServer {
     pub fn serve(
         state: Arc<State>,
         addr: &SocketAddr,
-    ) -> impl Future<Item = (), Error = std::io::Error> {
-        let new_service = server::MemberServer::new(MemberServer::new(addr.clone(), state));
+    ) -> impl Future01<Item = (), Error = std::io::Error> {
+        let new_service = server::MemberServer::new(MemberServer::new(*addr, state));
         let mut h2 = Server::new(new_service, Default::default(), DefaultExecutor::current());
 
         TcpListener::bind(&addr)
@@ -43,64 +52,100 @@ impl MemberServer {
                 Ok(())
             })
     }
+
+    pub async fn join(
+        request: Request<Push>,
+        addr: SocketAddr,
+        inner: Arc<State>,
+    ) -> Result<Response<Pull>> {
+        // let inner = self.inner.clone();
+        // let addr = self.addr;
+
+        let from = request.into_inner().from.unwrap();
+
+        info!("Join Request: {}:{}", from.id, from.address);
+
+        let from_id = Uuid::parse_str(from.id.as_str())?;
+        let from_addr = from.address.parse().unwrap();
+
+        let peers = {
+            let peers = await!(inner.peers().lock());
+
+            peers
+                .iter()
+                .map(|(id, peer)| Peer {
+                    id: id.to_string(),
+                    address: peer.addr().to_string(),
+                })
+                .collect()
+        };
+
+        await!(inner.peer_join(from_id, from_addr));
+
+        trace!("Pushing these peers: {:?}", peers);
+
+        let current_peer = Peer {
+            id: await!(inner.id().lock()).to_string(),
+            address: addr.to_string(),
+        };
+
+        Ok(Response::new(Pull {
+            from: Some(current_peer),
+            peers,
+        }))
+    }
 }
 
 impl server::Member for MemberServer {
     type JoinFuture =
-        Box<dyn Future<Item = Response<Pull>, Error = tower_grpc::Error> + Send + 'static>;
+        Box<dyn Future01<Item = Response<Pull>, Error = tower_grpc::Error> + Send + 'static>;
 
     fn join(&mut self, request: Request<Push>) -> Self::JoinFuture {
         let inner = self.inner.clone();
-        let addr = self.addr.clone();
+        let addr = self.addr;
+        let fut = Self::join(request, addr, inner);
 
-        let fut = async move { await!(join(inner, request, addr)).unwrap() };
-
-        Box::new(
-            fut.unit_error()
-                .boxed()
-                .compat()
-                .map_err(|e| tower_grpc::Error::Inner(e)),
-        )
+        let fut = Box::pinned(fut);
+        let fut = TowerError::new(fut);
+        Box::new(fut.compat())
     }
 }
 
-pub async fn join(
-    inner: Arc<State>,
-    request: Request<Push>,
-    addr: SocketAddr,
-) -> Result<Response<Pull>, ()> {
-    let from = request.into_inner().from.unwrap();
+/// Future for the `unit_error` combinator, turning a `Future` into a `TryFuture`.
+#[derive(Debug)]
+#[must_use = "futures do nothing unless polled"]
+pub struct TowerError<Fut> {
+    future: Fut,
+}
 
-    info!("Join Request: {}:{}", from.id, from.address);
+impl<Fut> TowerError<Fut> {
+    unsafe_pinned!(future: Fut);
 
-    let from_id = Uuid::parse_str(from.id.as_str()).unwrap();
-    let from_addr = from.address.parse().unwrap();
+    /// Creates a new UnitError.
+    pub(super) fn new(future: Fut) -> TowerError<Fut> {
+        TowerError { future }
+    }
+}
 
-    await!(inner.peer_join(from_id, from_addr));
+impl<Fut: Unpin> Unpin for TowerError<Fut> {}
+use std::result::Result as StdResult;
+impl<Fut, T, E> Future for TowerError<Fut>
+where
+    E: std::fmt::Display,
+    Fut: Future<Output = StdResult<T, E>>,
+{
+    type Output = StdResult<T, tower_grpc::Error>;
 
-    let peers = {
-        let peers = await!(inner.peers().lock());
-
-        peers
-            .iter()
-            .map(|(id, peer)| Peer {
-                id: id.to_string(),
-                address: peer.addr().to_string(),
-            })
-            .collect()
-    };
-
-    trace!("Pushing these peers: {:?}", peers);
-
-    let current_peer = Peer {
-        id: await!(inner.id().lock()).to_string(),
-        address: addr.to_string(),
-    };
-
-    Ok(Response::new(Pull {
-        from: Some(current_peer),
-        peers,
-    }))
+    fn poll(mut self: Pin<&mut Self>, lw: &LocalWaker) -> Poll<Self::Output> {
+        match self.future().poll(lw) {
+            Poll::Ready(Ok(i)) => Poll::Ready(Ok(i)),
+            Poll::Ready(Err(e)) => {
+                error!("RPC Error: {}", e);
+                Poll::Ready(Err(tower_grpc::Error::Inner(())))
+            }
+            Poll::Pending => Poll::Pending,
+        }
+    }
 }
 
 #[cfg(test)]

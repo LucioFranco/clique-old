@@ -40,6 +40,6 @@ impl Client {
         let request = self.client.join(Request::new(push));
 
         let response = await!(request.compat());
-        response.map(|e| e.into_inner()).map_err(|e| Error::from(e))
+        response.map(|e| e.into_inner()).map_err(Error::from)
     }
 }

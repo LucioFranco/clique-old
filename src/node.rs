@@ -46,7 +46,7 @@ impl Node {
         let peers = await!(self.inner.peers().lock());
         peers
             .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
+            .map(|(k, v)| (*k, v.clone()))
             .collect::<HashMap<Uuid, Peer>>()
     }
 
@@ -56,12 +56,12 @@ impl Node {
         // TODO: add proper address selection process
         let join_addr = peers.into_iter().next().expect("One addrs required");
 
-        let local_addr = self.addr.clone();
+        let local_addr = self.addr;
         let uri: http::Uri = format!("http://{}:{}", local_addr.ip(), local_addr.port())
             .parse()
             .unwrap();
 
-        let from_address = local_addr.clone();
+        let from_address = local_addr;
 
         let id = await!(self.inner.id().lock()).to_string();
 
@@ -96,6 +96,7 @@ impl Node {
                         Uuid::parse_str(peer.id.as_str()).unwrap(),
                     )
                 })
+                .filter(|(addr, _id)| addr == &self.addr)
                 .collect()
         };
 
@@ -115,8 +116,8 @@ impl Node {
         let addr = socket.local_addr()?;
 
         let udp_listener = self.listen_udp(socket, (tx.clone(), rx));
-        let tcp_listener = self.listen_tcp(addr.clone());
-        let gossiper = self.gossip(tx);
+        let tcp_listener = self.listen_tcp(addr);
+        let gossiper = self.gossip(tx.clone());
         let failures = self.failures(Duration::from_secs(1));
 
         join!(tcp_listener, udp_listener, gossiper, failures);
@@ -133,9 +134,11 @@ impl Node {
     async fn listen_udp(
         &self,
         socket: UdpSocket,
-        (tx, rx): (Sender<(Msg, SocketAddr)>, Receiver<(Msg, SocketAddr)>),
+        channel: (Sender<(Msg, SocketAddr)>, Receiver<(Msg, SocketAddr)>),
     ) {
         info!("Listening on: {}", self.addr);
+
+        let (tx, rx) = channel;
 
         let framed = UdpFramed::new(socket, MsgCodec);
 
@@ -189,9 +192,10 @@ impl Node {
             Msg::Ack(seq, broadcasts) => {
                 let failures = self.inner.failures();
                 let mut failures = await!(failures.lock());
-                failures.handle_ack(&seq);
+                failures.handle_ack(seq);
                 await!(self.inner.apply_broadcasts(broadcasts));
             }
+            _ => unimplemented!(),
         };
     }
 
@@ -221,7 +225,8 @@ impl Node {
 
                 for (_, peer) in heartbeats {
                     let addr = peer.addr();
-                    let seq_num = failures.add(addr.clone());
+                    let seq_num = failures.add(addr);
+                    println!("Sending mesage to {}", addr);
                     msg.push((Msg::Ping(seq_num, broadcasts.clone()), addr));
                 }
                 msg

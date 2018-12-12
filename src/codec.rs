@@ -9,6 +9,8 @@ use {
 pub enum Msg {
     Ping(SeqNum, Vec<Broadcast>),
     Ack(SeqNum, Vec<Broadcast>),
+    PingReq(SeqNum, Vec<Broadcast>),
+    NAck(SeqNum, Vec<Broadcast>),
 }
 
 pub struct MsgCodec;
@@ -18,7 +20,7 @@ impl Decoder for MsgCodec {
     type Error = std::io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> std::io::Result<Option<Msg>> {
-        if buf.len() > 0 {
+        if buf.is_empty() {
             let decode_msg = serde_json::from_slice(&buf[..])?;
             Ok(Some(decode_msg))
         } else {

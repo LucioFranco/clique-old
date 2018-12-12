@@ -16,7 +16,7 @@ fn main() {
 
     let peer_addr = std::env::args().nth(2);
 
-    std::env::set_var("RUST_LOG", "clique=trace");
+    std::env::set_var("RUST_LOG", "clique=debug");
     pretty_env_logger::init();
 
     // Bootstrap lazy future to allow us to call spawn

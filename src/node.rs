@@ -13,7 +13,6 @@ use {
         join, SinkExt, StreamExt,
     },
     log::{error, info, trace},
-    pin_utils::pin_mut,
     std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration},
     tokio::{
         net::{UdpFramed, UdpSocket},
@@ -138,17 +137,14 @@ impl Node {
     ) {
         info!("Listening on: {}", self.addr);
 
-        let (tx, rx) = channel;
+        let (tx, mut rx) = channel;
 
         let framed = UdpFramed::new(socket, MsgCodec);
 
-        let (sink, stream) = {
+        let (mut sink, mut stream) = {
             let (sink, stream) = framed.split();
             (sink.compat_sink(), stream.compat())
         };
-        pin_mut!(sink);
-        pin_mut!(stream);
-        pin_mut!(rx);
 
         let message_receiver = async {
             while let Some(Ok(msg)) = await!(stream.next()) {
@@ -226,7 +222,6 @@ impl Node {
                 for (_, peer) in heartbeats {
                     let addr = peer.addr();
                     let seq_num = failures.add(addr);
-                    println!("Sending mesage to {}", addr);
                     msg.push((Msg::Ping(seq_num, broadcasts.clone()), addr));
                 }
                 msg

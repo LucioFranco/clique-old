@@ -4,7 +4,7 @@ use {
         rpc::proto::{server, Peer, Pull, Push},
         state::State,
     },
-    futures::{future::TryFutureExt},
+    futures::future::TryFutureExt,
     log::{error, info, trace},
     pin_utils::unsafe_pinned,
     std::{
@@ -68,6 +68,8 @@ impl MemberServer {
         let from_id = Uuid::parse_str(from.id.as_str())?;
         let from_addr = from.address.parse().unwrap();
 
+        await!(inner.peer_join(from_id, from_addr));
+
         let peers = {
             let peers = await!(inner.peers().lock());
 
@@ -79,8 +81,6 @@ impl MemberServer {
                 })
                 .collect()
         };
-
-        await!(inner.peer_join(from_id, from_addr));
 
         trace!("Pushing these peers: {:?}", peers);
 

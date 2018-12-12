@@ -20,7 +20,7 @@ impl Decoder for MsgCodec {
     type Error = std::io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> std::io::Result<Option<Msg>> {
-        if buf.is_empty() {
+        if !buf.is_empty() {
             let decode_msg = serde_json::from_slice(&buf[..])?;
             Ok(Some(decode_msg))
         } else {

@@ -4,6 +4,10 @@
 
 A SWIM based gossip agent and library. Inspired by serf.
 
+## Roadmap
+
+The roadmap can be found here [roadmap](docs/ROADMAP.md), this project is still very much a work in progress and requires nightly to compile.
+
 ## Building
 
 To build clique you will need a nightly version of `rustc`, my current version is `rustc 1.32.0-nightly (d09466ceb 2018-11-30)`. This toolchain is needed to use `async/await`.

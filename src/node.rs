@@ -2,10 +2,11 @@ use {
     crate::{
         codec::{Msg, MsgCodec},
         error::Result,
+        peer::Peer,
         rpc::{client::Client, server::MemberServer},
         state::{NodeState, State},
     },
-    clique_proto::{Peer, Push},
+    clique_proto::{Peer as PeerProto, Push},
     futures::{
         channel::mpsc::{self, Receiver, Sender},
         compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
@@ -13,7 +14,7 @@ use {
     },
     log::{error, info, trace},
     pin_utils::pin_mut,
-    std::{net::SocketAddr, sync::Arc, time::Duration},
+    std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration},
     tokio::{
         net::{UdpFramed, UdpSocket},
         prelude::Stream as Stream01,
@@ -35,6 +36,14 @@ impl Node {
         }
     }
 
+    pub async fn peers(&self) -> HashMap<Uuid, Peer> {
+        let peers = await!(self.inner.peers().lock());
+        peers
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<HashMap<Uuid, Peer>>()
+    }
+
     pub async fn join(&self, peers: Vec<SocketAddr>) -> Result<()> {
         // TODO: add proper address selection process
         let join_addr = peers.into_iter().next().expect("One addrs required");
@@ -50,7 +59,7 @@ impl Node {
 
         let mut client = await!(Client::connect(&join_addr, uri))?;
 
-        let from = Peer {
+        let from = PeerProto {
             id: id.to_string(),
             address: from_address.to_string(),
         };

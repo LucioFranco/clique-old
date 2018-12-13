@@ -20,7 +20,7 @@ pub enum NodeState {
 #[derive(Debug)]
 pub struct State {
     id: Mutex<Uuid>,
-    peers: Mutex<IndexMap<Uuid, Peer>>,
+    peers: Mutex<IndexMap<SocketAddr, Peer>>,
     state: Mutex<NodeState>,
     broadcasts: Mutex<Broadcasts>,
     failures: Mutex<Failure>,
@@ -37,7 +37,7 @@ impl State {
         }
     }
 
-    pub fn peers(&self) -> &Mutex<IndexMap<Uuid, Peer>> {
+    pub fn peers(&self) -> &Mutex<IndexMap<SocketAddr, Peer>> {
         &self.peers
     }
 
@@ -62,10 +62,10 @@ impl State {
         let mut peers = await!(self.peers.lock());
 
         for (addr, id) in incoming_peers {
-            if !peers.contains_key(&id) {
+            if !peers.contains_key(&addr) {
                 trace!("Adding peer: {:?}, from: {:?}", id, addr);
                 let peer = Peer::new_alive(id.clone(), addr);
-                peers.insert(id, peer);
+                peers.insert(addr, peer);
             }
         }
     }
@@ -73,7 +73,7 @@ impl State {
     pub async fn peer_join(&self, id: Uuid, addr: SocketAddr) {
         let peer = Peer::new_alive(id, addr);
         let mut peers = await!(self.peers.lock());
-        peers.insert(peer.id(), peer);
+        peers.insert(peer.addr(), peer);
         await!(self.add_broadcast(Broadcast::Joined(id, addr)));
     }
 
@@ -87,13 +87,13 @@ impl State {
             match broadcast {
                 Broadcast::Joined(id, addr) => {
                     let mut peers = await!(self.peers().lock());
-                    if !peers.contains_key(&id) {
+                    if !peers.contains_key(&addr) {
                         // TODO: check to see if the addr matches what we know of that peer
                         let peer = Peer::new_alive(id, addr);
 
                         info!("Peer: {} has joined", peer.id().to_string());
 
-                        peers.insert(peer.id(), peer);
+                        peers.insert(peer.addr(), peer);
                         await!(self.add_broadcast(Broadcast::Joined(id, addr)));
                     }
                 }

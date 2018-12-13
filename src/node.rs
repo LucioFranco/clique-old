@@ -41,12 +41,12 @@ impl Node {
     /// Get a snapshot of the current list of peers. This currently allocates a new
     /// [HashMap] everytime its called to avoid lock contention. This function is
     /// async due to it aquiring a lock.
-    pub async fn peers(&self) -> HashMap<Uuid, Peer> {
+    pub async fn peers(&self) -> HashMap<SocketAddr, Peer> {
         let peers = await!(self.inner.peers().lock());
         peers
             .iter()
             .map(|(k, v)| (*k, v.clone()))
-            .collect::<HashMap<Uuid, Peer>>()
+            .collect::<HashMap<SocketAddr, Peer>>()
     }
 
     /// Join the cluster via a list of Peers. Currently, only selects the
@@ -239,15 +239,16 @@ impl Node {
 
         while let Some(_) = await!(interval.next()) {
             let failed_nodes = {
-                let failures = self.inner.failures();
-                let mut failures = await!(failures.lock());
+                let mut failures = await!(self.inner.failures().lock());
                 failures.gather()
             };
 
-            if !failed_nodes.is_empty() {
-                // TODO: change state for failed node
-                info!("Timeouts: {:?}", failed_nodes);
+
+            let mut peers = await!(self.inner.peers().lock());
+            for failed_node in failed_nodes {
+                peers.get_mut(&failed_node);
             }
+
         }
     }
 }

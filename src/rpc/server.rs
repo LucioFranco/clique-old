@@ -75,9 +75,9 @@ impl MemberServer {
 
             peers
                 .iter()
-                .map(|(id, peer)| Peer {
-                    id: id.to_string(),
-                    address: peer.addr().to_string(),
+                .map(|(addr, peer)| Peer {
+                    id: peer.id().to_string(),
+                    address: addr.to_string(),
                 })
                 .collect()
         };
@@ -156,12 +156,12 @@ mod test {
         clique_proto::{server::Member, Peer, Push},
         futures::compat::Future01CompatExt,
         std::sync::Arc,
-        tokio_async_await_test::async_test,
+        tokio_async_await_test::async_current_thread_test,
         tower_grpc::Request,
         uuid::Uuid,
     };
 
-    #[async_test]
+    #[async_current_thread_test]
     async fn join() {
         let addr = "127.0.0.1:1234".to_string();
         let state = Arc::new(State::new());

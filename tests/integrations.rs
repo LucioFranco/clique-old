@@ -1,23 +1,11 @@
 #![feature(pin, await_macro, async_await, futures_api)]
 
-extern crate tokio_async_await_test;
+mod util;
 
 use {
+    crate::util::{async_current_thread_test, next_addr, sleep_ms, spawn},
     clique::Node,
-    futures::{
-        compat::{Future01CompatExt, TokioDefaultSpawner},
-        future::FutureExt,
-        task::SpawnExt,
-    },
-    std::{
-        future::Future,
-        net::SocketAddr,
-        sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
-        },
-    },
-    tokio_async_await_test::async_current_thread_test,
+    std::sync::Arc,
 };
 
 #[async_current_thread_test]
@@ -68,32 +56,13 @@ async fn join_3_node() {
     await!(node_c.join(vec![node_a_addr])).unwrap();
     spawn(async move { await!(node_c.serve()).unwrap() });
 
-    await!(sleep_ms(1000));
+    await!(sleep_ms(1500));
 
-    let members = await!(node_b.peers());
-    assert_eq!(members.len(), 2);
-}
+    assert_eq!(await!(node_b.peers()).len(), 2);
+    // let num_members = async move {
+    //     let peers = await!(node_b.peers());
 
-async fn sleep_ms(ms: u64) {
-    use std::time::{Duration, Instant};
-    use tokio::await;
-    use tokio::timer::Delay;
-
-    let when = Instant::now() + Duration::from_millis(ms);
-
-    await!(Delay::new(when).compat()).expect("Error running sleep");
-}
-
-fn spawn<F>(f: F)
-where
-    F: Future + Send + 'static,
-{
-    TokioDefaultSpawner.spawn(f.map(|_| ())).unwrap();
-}
-
-static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
-fn next_addr() -> SocketAddr {
-    use std::net::{IpAddr, Ipv4Addr};
-    let port = NEXT_PORT.fetch_add(1, Ordering::AcqRel) as u16;
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+    //     peers.len()
+    // };
+    // assert_eventually_eq!(await!(num_members), 2);
 }

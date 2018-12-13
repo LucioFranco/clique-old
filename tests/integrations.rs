@@ -32,7 +32,7 @@ async fn join() {
 #[async_current_thread_test]
 async fn join_3_node() {
     let nodes = await!(create_cluster(3));
-    await!(assert_eventually_eq(nodes, 2, 10));
+    await!(assert_eventually_eq(nodes, 2, 30));
 }
 
 #[async_current_thread_test]

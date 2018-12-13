@@ -20,7 +20,8 @@
   - [ ] Piggybacking UDP Gossip messages
   - [ ] Gossip
   	- [x] Gossip on configured interval
-	- [ ] `> 3` Cluster pick `k` random nodes to probe
+	- [ ] Pick random node to probe
+	- [ ] Detect failure and select ``k nodes to `PingReq`
   -[ ] RPC
 	- [x] Join Push/Pull
 	- [ ] Occasional Push/Pull requests

@@ -243,12 +243,11 @@ impl Node {
                 failures.gather()
             };
 
-
             let mut peers = await!(self.inner.peers().lock());
             for failed_node in failed_nodes {
-                peers.get_mut(&failed_node);
+                let mut peer = peers.get_mut(&failed_node);
+                // peer.state = PeerState::Suspected;
             }
-
         }
     }
 }

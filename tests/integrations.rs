@@ -3,7 +3,7 @@
 mod util;
 
 use {
-    crate::util::{async_current_thread_test, next_addr, sleep_ms, spawn},
+    crate::util::{async_current_thread_test, async_test, next_addr, sleep_ms, spawn},
     clique::Node,
     std::sync::Arc,
 };
@@ -31,38 +31,58 @@ async fn join() {
 
 #[async_current_thread_test]
 async fn join_3_node() {
-    let node_a_addr = next_addr();
-    let node_b_addr = next_addr();
-    let node_c_addr = next_addr();
+    let nodes = await!(create_cluster(3));
+    await!(assert_eventually_eq(nodes, 2, 10));
+}
 
-    let node_a = Node::new(node_a_addr);
-    spawn(async move { await!(node_a.serve()).unwrap() });
+#[async_current_thread_test]
+async fn join_5_node() {
+    let nodes = await!(create_cluster(5));
+    await!(assert_eventually_eq(nodes, 4, 30));
+}
 
-    let node_b = Arc::new(Node::new(node_b_addr));
+#[async_test]
+async fn join_12_node() {
+    let nodes = await!(create_cluster(12));
+    await!(assert_eventually_eq(nodes, 11, 100));
+}
 
-    await!(sleep_ms(500));
+async fn create_cluster(size: usize) -> Vec<Arc<Node>> {
+    let join_addr = next_addr();
+    let node_origin = Arc::new(Node::new(join_addr));
+    let node_origin_clone = node_origin.clone();
+    spawn(async move { await!(node_origin_clone.serve()).unwrap() });
 
-    await!(node_b.join(vec![node_a_addr])).unwrap();
+    await!(sleep_ms(100));
 
-    let node_b_clone = Arc::clone(&node_b);
-    spawn(async move { await!(node_b_clone.serve()).unwrap() });
+    let mut nodes = vec![node_origin.clone()];
+    for _ in 0usize..(size - 1) {
+        let node = Arc::new(Node::new(next_addr()));
+        let node_clone = node.clone();
+        spawn(async move { await!(node_clone.serve()).unwrap() });
 
-    let members = await!(node_b.peers());
-    assert_eq!(members.len(), 1);
+        await!(node.join(vec![join_addr])).unwrap();
+        nodes.push(node);
+    }
 
-    await!(sleep_ms(500));
+    nodes
+}
 
-    let node_c = Node::new(node_c_addr);
-    await!(node_c.join(vec![node_a_addr])).unwrap();
-    spawn(async move { await!(node_c.serve()).unwrap() });
+async fn assert_eventually_eq(nodes: Vec<Arc<Node>>, num: usize, limit: usize) {
+    for node in nodes {
+        for i in 0..limit {
+            let node = node.clone();
+            let peers = await!(node.peers()).len();
 
-    await!(sleep_ms(1500));
+            if i == (limit - 1) {
+                assert_eq!(peers, num);
+            }
 
-    assert_eq!(await!(node_b.peers()).len(), 2);
-    // let num_members = async move {
-    //     let peers = await!(node_b.peers());
-
-    //     peers.len()
-    // };
-    // assert_eventually_eq!(await!(num_members), 2);
+            if peers != num {
+                await!(sleep_ms(100));
+            } else {
+                break;
+            }
+        }
+    }
 }

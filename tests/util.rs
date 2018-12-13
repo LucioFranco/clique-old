@@ -1,30 +1,36 @@
 #![allow(unused_attributes)]
 #![feature(await_macro, async_await, futures_api)]
 
+use futures::{
+    compat::{Future01CompatExt, TokioDefaultSpawner},
+    future::FutureExt,
+    task::SpawnExt,
+};
 use std::{
     future::Future,
     net::SocketAddr,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use futures::{
-    compat::{Future01CompatExt, TokioDefaultSpawner},
-    future::FutureExt,
-    task::SpawnExt,
-};
-
 pub use tokio_async_await_test::{async_current_thread_test, async_test};
 
-#[macro_export]
-macro_rules! assert_eventually_eq {
-    ($a: expr, $b: expr) => {{
-        await!(sleep_ms(200));
+// #[macro_export]
+// macro_rules! assert_eventually_eq {
+//     ($a: expr, $b: expr) => {{
+//         let a = Box::new($a);
+//         let mut iter: u32 = 0;
+//         loop {
+//             iter += 1;
+//             await!(sleep_ms(200));
 
-        if $a != $b {
-            assert_eq!($a, $b);
-        }
-    }};
-}
+//             let a = a.clone();
+//             let a = await!(a);
+//             if a == $b {
+//                 break;
+//             }
+//         }
+//     }};
+// }
 
 pub async fn sleep_ms(ms: u64) {
     use std::time::{Duration, Instant};

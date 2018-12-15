@@ -6,7 +6,7 @@ use {
     },
     futures::lock::Mutex,
     indexmap::IndexMap,
-    log::{info, debug},
+    log::{debug, info},
     rand::{seq::IteratorRandom, thread_rng},
     std::{net::SocketAddr, time::Duration},
     uuid::Uuid,
@@ -94,7 +94,7 @@ impl State {
             match broadcast {
                 Broadcast::Joined(id, addr) => {
                     let our_id = await!(self.id.lock());
-                    
+
                     if id != *our_id {
                         let mut peers = await!(self.peers().lock());
                         if !peers.contains_key(&addr) {

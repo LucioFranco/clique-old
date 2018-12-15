@@ -152,7 +152,7 @@ where
 mod test {
     use {
         super::MemberServer,
-        crate::state::State,
+        crate::{state::State, support::next_addr},
         clique_proto::{server::Member, Peer, Push},
         futures::compat::Future01CompatExt,
         std::sync::Arc,
@@ -162,14 +162,14 @@ mod test {
     };
 
     #[async_current_thread_test]
-    async fn join() {
-        let addr = "127.0.0.1:1234".to_string();
+    async fn join_empty() {
+        let addr = next_addr();
         let state = Arc::new(State::new());
-        let mut server = MemberServer::new(addr.parse().unwrap(), state);
+        let mut server = MemberServer::new(addr, state);
 
         let from = Peer {
             id: Uuid::new_v4().to_string(),
-            address: addr,
+            address: addr.to_string(),
         };
 
         let request = Request::new(Push {
@@ -178,7 +178,45 @@ mod test {
         });
 
         let response = await!(server.join(request).compat()).unwrap();
-        //assert_eq!(response.into_inner().peers, vec![from]);
         assert!(response.into_inner().peers.is_empty());
+    }
+
+    #[async_current_thread_test]
+    async fn join_non_empty() {
+        let addr = next_addr();
+        let state = Arc::new(State::new());
+        let mut server = MemberServer::new(addr, state);
+
+        let addr2 = next_addr();
+        let from = Peer {
+            id: Uuid::new_v4().to_string(),
+            address: addr2.to_string(),
+        };
+
+        let request = Request::new(Push {
+            from: Some(from.clone()),
+            peers: vec![],
+        });
+
+        let response = await!(server.join(request).compat()).unwrap();
+        assert!(response.into_inner().peers.is_empty());
+
+        let from2 = Peer {
+            id: Uuid::new_v4().to_string(),
+            address: next_addr().to_string(),
+        };
+
+        let request = Request::new(Push {
+            from: Some(from.clone()),
+            peers: vec![],
+        });
+
+        let response = await!(server.join(request).compat()).unwrap();
+        let mut peers = response.into_inner().peers;
+
+        assert_eq!(peers.len(), 1);
+
+        let peer = peers.pop().unwrap();
+        assert_eq!(peer.address, addr2.to_string());
     }
 }

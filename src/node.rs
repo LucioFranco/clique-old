@@ -87,7 +87,8 @@ impl Node {
                 from.id, from.address
             );
 
-            let mut peers = body.peers
+            let mut peers = body
+                .peers
                 .into_iter()
                 .map(|peer| {
                     (
@@ -98,7 +99,10 @@ impl Node {
                 //.filter(|(addr, _id)| addr == &self.addr)
                 .collect::<Vec<_>>();
 
-            let from = (from.address.parse().unwrap(), Uuid::parse_str(from.id.as_str()).unwrap());
+            let from = (
+                from.address.parse().unwrap(),
+                Uuid::parse_str(from.id.as_str()).unwrap(),
+            );
             peers.push(from);
             peers
         };
@@ -234,8 +238,8 @@ impl Node {
 
             let mut peers = await!(self.inner.peers().lock());
             for failed_node in failed_nodes {
-                let mut peer = peers.get_mut(&failed_node);
-                // peer.state = PeerState::Suspected;
+                //let mut peer = peers.get_mut(&failed_node);
+
             }
         }
     }

@@ -12,7 +12,7 @@ use {
         compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
         join, SinkExt, StreamExt,
     },
-    log::{error, info, trace},
+    log::{debug, error, info, trace},
     std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration},
     tokio::{
         net::{UdpFramed, UdpSocket},
@@ -87,7 +87,7 @@ impl Node {
                 from.id, from.address
             );
 
-            body.peers
+            let mut peers = body.peers
                 .into_iter()
                 .map(|peer| {
                     (
@@ -95,8 +95,12 @@ impl Node {
                         Uuid::parse_str(peer.id.as_str()).unwrap(),
                     )
                 })
-                .filter(|(addr, _id)| addr == &self.addr)
-                .collect()
+                //.filter(|(addr, _id)| addr == &self.addr)
+                .collect::<Vec<_>>();
+
+            let from = (from.address.parse().unwrap(), Uuid::parse_str(from.id.as_str()).unwrap());
+            peers.push(from);
+            peers
         };
 
         await!(self.inner.peers_sync(peers));
@@ -105,7 +109,7 @@ impl Node {
         Ok(())
     }
 
-    /// Spawna long running future that will start both the listeners
+    /// Spawn a long running future that will start both the listeners
     /// on `TCP` and `UDP`. It will also start the gossiper and failure
     /// detection portions of the application.
     pub async fn serve(&self) -> Result<()> {
@@ -175,7 +179,7 @@ impl Node {
 
                 let ack = {
                     let mut broadcasts = await!(self.inner.broadcasts().lock());
-                    let broadcasts = broadcasts.drain();
+                    let broadcasts = broadcasts.get();
                     Msg::Ack(seq, broadcasts)
                 };
 
@@ -195,41 +199,26 @@ impl Node {
         };
     }
 
-    async fn gossip(&self, tx: Sender<(Msg, SocketAddr)>) {
+    async fn gossip(&self, mut tx: Sender<(Msg, SocketAddr)>) {
         use tokio::prelude::StreamAsyncExt;
         let mut interval = Interval::new_interval(Duration::from_secs(1));
 
         while let Some(_) = await!(interval.next()) {
             trace!("Sending heartbeats");
 
-            let broadcasts = {
-                // This acquires a lock so we need to make sure it gets dropped
-                // before any `await!`.
-                let mut broadcasts = await!(self.inner.broadcasts().lock());
-                broadcasts.drain()
-            };
+            let broadcasts = await!(self.inner.broadcasts().lock()).get();
 
-            let heartbeats = {
-                let peers = await!(self.inner.peers().lock());
-                peers.clone().into_iter().collect::<Vec<_>>()
-            };
+            if let Some(peer) = await!(self.inner.get_peer()) {
+                debug!("Probing peer: {}", peer);
 
-            let pings = {
-                let mut msg = Vec::new();
-                let failures = self.inner.failures();
-                let mut failures = await!(failures.lock());
+                let mut failures = await!(self.inner.failures().lock());
 
-                for (_, peer) in heartbeats {
-                    let addr = peer.addr();
-                    let seq_num = failures.add(addr);
-                    msg.push((Msg::Ping(seq_num, broadcasts.clone()), addr));
+                let seq_num = failures.add(peer.addr());
+                let msg = (Msg::Ping(seq_num, broadcasts.clone()), peer.addr());
+
+                if let Err(e) = await!(tx.send(msg)) {
+                    error!("Error sending ping: {}", e);
                 }
-                msg
-            };
-
-            for ping in pings {
-                let mut tx = tx.clone();
-                await!(tx.send(ping)).expect("Unable to send ping");
             }
         }
     }

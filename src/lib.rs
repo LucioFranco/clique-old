@@ -13,5 +13,8 @@ mod peer;
 mod rpc;
 mod state;
 
+#[cfg(test)]
+mod support;
+
 pub use crate::error::{Error, Result};
 pub use crate::node::Node;

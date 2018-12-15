@@ -17,11 +17,11 @@ pub struct MsgCodec;
 
 impl Decoder for MsgCodec {
     type Item = Msg;
-    type Error = std::io::Error;
+    type Error = bincode::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> std::io::Result<Option<Msg>> {
+    fn decode(&mut self, buf: &mut BytesMut) -> bincode::Result<Option<Msg>> {
         if !buf.is_empty() {
-            let decode_msg = serde_json::from_slice(&buf[..])?;
+            let decode_msg = bincode::deserialize(&buf[..])?;
             Ok(Some(decode_msg))
         } else {
             Ok(None)
@@ -31,10 +31,10 @@ impl Decoder for MsgCodec {
 
 impl Encoder for MsgCodec {
     type Item = Msg;
-    type Error = std::io::Error;
+    type Error = bincode::Error;
 
-    fn encode(&mut self, data: Msg, buf: &mut BytesMut) -> std::io::Result<()> {
-        let bytes = serde_json::to_vec(&data)?;
+    fn encode(&mut self, data: Msg, buf: &mut BytesMut) -> bincode::Result<()> {
+        let bytes = bincode::serialize(&data)?;
         buf.put(&bytes[..]);
         Ok(())
     }

@@ -11,6 +11,8 @@ pub enum Error {
     Io(std::io::Error),
     /// Uuid parsing errors
     Uuid(uuid::parser::ParseError),
+    /// Bincode decoding errors
+    Bincode(bincode::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -19,6 +21,7 @@ impl std::fmt::Display for Error {
             Error::Grpc(ref inner) => write!(f, "Grpc Error: {}", inner),
             Error::Io(ref inner) => write!(f, "Io Error: {}", inner),
             Error::Uuid(ref inner) => write!(f, "Uuid error: {}", inner),
+            Error::Bincode(ref inner) => write!(f, "Bincode error: {}", inner),
         }
     }
 }
@@ -38,5 +41,11 @@ impl From<std::io::Error> for Error {
 impl From<uuid::parser::ParseError> for Error {
     fn from(err: uuid::parser::ParseError) -> Self {
         Error::Uuid(err)
+    }
+}
+
+impl From<bincode::Error> for Error {
+    fn from(err: bincode::Error) -> Self {
+        Error::Bincode(err)
     }
 }

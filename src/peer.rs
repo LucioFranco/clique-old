@@ -35,3 +35,9 @@ impl Peer {
         self.state.clone()
     }
 }
+
+impl std::fmt::Display for Peer {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "Peer(id: {}, addr: {})", self.id, self.addr)
+    }
+}

@@ -6,7 +6,8 @@ use {
     },
     futures::lock::Mutex,
     indexmap::IndexMap,
-    log::{info, trace},
+    log::{info, debug},
+    rand::{seq::IteratorRandom, thread_rng},
     std::{net::SocketAddr, time::Duration},
     uuid::Uuid,
 };
@@ -45,7 +46,7 @@ impl State {
         &self.id
     }
 
-    pub fn failures(&self) -> &'_ Mutex<Failure> {
+    pub fn failures(&self) -> &Mutex<Failure> {
         &self.failures
     }
 
@@ -63,11 +64,17 @@ impl State {
 
         for (addr, id) in incoming_peers {
             if !peers.contains_key(&addr) {
-                trace!("Adding peer: {:?}, from: {:?}", id, addr);
+                debug!("Adding peer: {:?}, from: {:?}", id, addr);
                 let peer = Peer::new_alive(id.clone(), addr);
                 peers.insert(addr, peer);
             }
         }
+    }
+
+    pub async fn get_peer(&self) -> Option<Peer> {
+        let peers = await!(self.peers.lock());
+        let mut rng = thread_rng();
+        peers.iter().choose(&mut rng).map(|(_, peer)| peer.clone())
     }
 
     pub async fn peer_join(&self, id: Uuid, addr: SocketAddr) {
@@ -86,14 +93,21 @@ impl State {
         for broadcast in broadcasts {
             match broadcast {
                 Broadcast::Joined(id, addr) => {
-                    let mut peers = await!(self.peers().lock());
-                    if !peers.contains_key(&addr) {
-                        // TODO: check to see if the addr matches what we know of that peer
-                        let peer = Peer::new_alive(id, addr);
+                    let our_id = await!(self.id.lock());
+                    
+                    if id != *our_id {
+                        let mut peers = await!(self.peers().lock());
+                        if !peers.contains_key(&addr) {
+                            // TODO: check to see if the addr matches what we know of that peer
+                            let peer = Peer::new_alive(id, addr);
 
-                        info!("Peer: {} has joined", peer.id().to_string());
+                            info!("Peer: {} has joined", peer.id().to_string());
 
-                        peers.insert(peer.addr(), peer);
+                            peers.insert(peer.addr(), peer);
+                            await!(self.add_broadcast(Broadcast::Joined(id, addr)));
+                        }
+                    } else {
+
                         await!(self.add_broadcast(Broadcast::Joined(id, addr)));
                     }
                 }

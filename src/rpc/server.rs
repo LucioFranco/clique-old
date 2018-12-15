@@ -68,8 +68,6 @@ impl MemberServer {
         let from_id = Uuid::parse_str(from.id.as_str())?;
         let from_addr = from.address.parse().unwrap();
 
-        await!(inner.peer_join(from_id, from_addr));
-
         let peers = {
             let peers = await!(inner.peers().lock());
 
@@ -83,6 +81,8 @@ impl MemberServer {
         };
 
         trace!("Pushing these peers: {:?}", peers);
+
+        await!(inner.peer_join(from_id, from_addr));
 
         let current_peer = Peer {
             id: await!(inner.id().lock()).to_string(),
@@ -178,6 +178,7 @@ mod test {
         });
 
         let response = await!(server.join(request).compat()).unwrap();
-        assert_eq!(response.into_inner().peers, vec![from]);
+        //assert_eq!(response.into_inner().peers, vec![from]);
+        assert!(response.into_inner().peers.is_empty());
     }
 }

@@ -29,22 +29,22 @@ async fn join() {
     assert_eq!(peers_b.len(), 1);
 }
 
-#[async_current_thread_test]
+#[async_test]
 async fn join_3_node() {
     let nodes = await!(create_cluster(3));
-    await!(assert_eventually_eq(nodes, 2, 30));
+    await!(assert_eventually_eq(nodes, 2, 300));
 }
 
-#[async_current_thread_test]
+#[async_test]
 async fn join_5_node() {
     let nodes = await!(create_cluster(5));
-    await!(assert_eventually_eq(nodes, 4, 30));
+    await!(assert_eventually_eq(nodes, 4, 300));
 }
 
 #[async_test]
 async fn join_12_node() {
     let nodes = await!(create_cluster(12));
-    await!(assert_eventually_eq(nodes, 11, 100));
+    await!(assert_eventually_eq(nodes, 11, 600));
 }
 
 async fn create_cluster(size: usize) -> Vec<Arc<Node>> {

@@ -16,8 +16,8 @@ travis-ci = { repository = "LucioFranco/clique", branch = "master" }
 
 [workspace]
 members = [
-    "clique-agent",
-    "clique-proto"
+    "components/agent",
+    "components/proto"
 ]
 
 [lib]
@@ -35,7 +35,7 @@ tokio = { version = "0.1", features = ["async-await-preview"] }
 uuid = { version = "0.7", features = ["serde", "v4"] }
 log = "0.4"
 http = "0.1"
-clique-proto = { path = "clique-proto" }
+clique-proto = { path = "components/proto" }
 tower-h2 = { git = "https://github.com/tower-rs/tower-h2" }
 tower-http = { git = "https://github.com/tower-rs/tower-http"  }
 tower-service = { git = "https://github.com/tower-rs/tower" }

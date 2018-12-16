@@ -13,4 +13,4 @@ futures-preview = { git = "https://github.com/LucioFranco/futures-rs", features 
 log = "0.4"
 tokio = { version = "0.1", features = ["async-await-preview"] }
 pretty_env_logger = "0.2"
-clique = { path = ".." }
+clique = { path = "../../" }

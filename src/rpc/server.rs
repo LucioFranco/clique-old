@@ -207,7 +207,7 @@ mod test {
         };
 
         let request = Request::new(Push {
-            from: Some(from.clone()),
+            from: Some(from2.clone()),
             peers: vec![],
         });
 

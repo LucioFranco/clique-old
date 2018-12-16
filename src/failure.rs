@@ -1,10 +1,11 @@
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    time::{Duration, Instant},
+use {
+    crate::acks::SeqNum,
+    std::{
+        collections::HashMap,
+        net::SocketAddr,
+        time::{Duration, Instant},
+    },
 };
-
-pub type SeqNum = u32;
 
 #[derive(Debug)]
 pub struct Failure {

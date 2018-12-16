@@ -1,11 +1,13 @@
 #![feature(pin, await_macro, async_await, futures_api)]
 
 use {
-    clique::Node,
+    clique::{Net, Node as RawNode},
     futures::future::{FutureExt, TryFutureExt},
     log::{error, info},
     std::{net::SocketAddr, sync::Arc},
 };
+
+type Node = RawNode<Net>;
 
 fn main() {
     let local_addr: SocketAddr = std::env::args()
@@ -42,7 +44,7 @@ async fn run(local_addr: SocketAddr, peer_addr: Option<String>) {
     }
 
     // Starts TCP, UDP and Gossip tasks
-    if let Err(e) = await!(node.serve()) {
+    if let Err(e) = await!(node.run()) {
         error!("Error running node: {}", e);
     }
 }

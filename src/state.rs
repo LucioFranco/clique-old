@@ -1,7 +1,7 @@
 use {
     crate::{
+        acks::Acks,
         broadcasts::{Broadcast, Broadcasts},
-        failure::Failure,
         peer::Peer,
     },
     futures::lock::Mutex,
@@ -24,7 +24,7 @@ pub struct State {
     peers: Mutex<IndexMap<SocketAddr, Peer>>,
     state: Mutex<NodeState>,
     broadcasts: Mutex<Broadcasts>,
-    failures: Mutex<Failure>,
+    acks: Mutex<Acks>,
 }
 
 impl State {
@@ -33,8 +33,8 @@ impl State {
             id: Mutex::new(Uuid::new_v4()),
             peers: Mutex::new(IndexMap::new()),
             state: Mutex::new(NodeState::Disconnected),
-            broadcasts: Mutex::new(Broadcasts::default()),
-            failures: Mutex::new(Failure::new(Duration::from_secs(2))),
+            broadcasts: Mutex::new(Broadcasts::new()),
+            acks: Mutex::new(Acks::new(Duration::from_secs(2))),
         }
     }
 
@@ -46,8 +46,8 @@ impl State {
         &self.id
     }
 
-    pub fn failures(&self) -> &Mutex<Failure> {
-        &self.failures
+    pub fn acks(&self) -> &Mutex<Acks> {
+        &self.acks
     }
 
     pub fn broadcasts(&self) -> &Mutex<Broadcasts> {
@@ -107,7 +107,6 @@ impl State {
                             await!(self.add_broadcast(Broadcast::Joined(id, addr)));
                         }
                     } else {
-
                         await!(self.add_broadcast(Broadcast::Joined(id, addr)));
                     }
                 }

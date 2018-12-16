@@ -1,5 +1,5 @@
 use {
-    crate::{broadcasts::Broadcast, failure::SeqNum},
+    crate::{acks::SeqNum, broadcasts::Broadcast},
     bytes::{BufMut, BytesMut},
     serde_derive::{Deserialize, Serialize},
     tokio::codec::{Decoder, Encoder},

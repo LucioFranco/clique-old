@@ -10,15 +10,19 @@ pub enum Broadcast {
 }
 
 impl Broadcast {
-    pub fn invalidates(other: Broadcast) -> bool {
+    pub fn invalidates(_other: Broadcast) -> bool {
         unimplemented!()
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Broadcasts(Vec<LimitedBroadcast>);
 
 impl Broadcasts {
+    pub fn new() -> Broadcasts {
+        Broadcasts(Vec::new())
+    }
+
     pub fn add(&mut self, broadcast: Broadcast) {
         // TODO: check if it invalidates another broadcast
         self.0.push(LimitedBroadcast::new(broadcast));
@@ -99,7 +103,7 @@ mod tests {
     fn basic() {
         let broadcast = Broadcast::Joined(Uuid::new_v4(), next_addr());
 
-        let mut broadcasts = Broadcasts::default();
+        let mut broadcasts = Broadcasts::new();
         broadcasts.add(broadcast.clone());
 
         let broadcast_to_send = broadcasts.get().pop();

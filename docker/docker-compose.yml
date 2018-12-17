@@ -2,17 +2,27 @@ version: '3.7'
 
 services:
   node-agent-1:
-    image: clique-agent:latest
+    build: ..
     environment:
-      - RUST_LOG=trace
+      - RUST_LOG=info
+    ports:
+      - "8081:8081"
     depends_on:
       - node-bootstrap
-    command: "agent 0.0.0.0:0 node-boostrap:8080"
+    networks:
+      - clique-demo
+    command: "agent 0.0.0.0:8081 node-boostrap:8080"
 
   node-bootstrap:
-    image: clique-agent:latest
-    # ports:
-    #   - "8080:8080"
+    build: ..
+    hostname: node-bootstrap
+    ports:
+      - "8080:8080"
     environment:
-      - RUST_LOG=trace
+      - RUST_LOG=info
+    networks:
+      - clique-demo
     command: "agent 0.0.0.0:8080"
+
+networks:
+  clique-demo:

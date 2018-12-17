@@ -49,9 +49,11 @@ async fn run(local_addr: SocketAddr, peer_addr: Option<String>) {
 }
 
 fn resolve<A: ToSocketAddrs>(target: A) -> SocketAddr {
-    let mut addrs = target.to_socket_addrs().unwrap();
-    match addrs.next() {
-        Some(addr) => addr,
-        None => panic!("Could not resolve!"),
-    }
+    let addrs = target.to_socket_addrs().unwrap();
+
+    let mut addrs2 = addrs.collect::<Vec<_>>();
+
+    info!("Found these address: {:?}", addrs2);
+
+    addrs2.pop().unwrap()
 }
